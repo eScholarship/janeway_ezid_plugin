@@ -1,4 +1,4 @@
-# EZID Janeway Plugin
+# Janeway EZID Plugin
 
 A plugin for [Janeway](https://janeway.systems/), enables minting of DOIs (via [EZID](https://ezid.cdlib.org/)) upon preprint acceptance to a Janeway repository.
 
@@ -6,10 +6,11 @@ The plugin is triggered by the `preprint_publication` event. This event happens 
 
 ## Installation
 
-1. copy the entire `ezid` folder to `src/plugins/` of your Janeway installation
+1. Clone this repo into /path/to/janeway/src/plugins/
 2. run `pip install xmltodict`
 3. run `python src/manage.py install_plugins`
-4. configure the plugin (see below)
+4. Restart your server (Apache, Passenger, etc).
+5. configure the plugin (see below)
 
 ## Configuration
 
