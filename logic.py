@@ -402,7 +402,8 @@ def process_ezid_result(article, action, ezid_result):
             logger.error('ezid_result: ' + ezid_result)
     else:
         logger.error('EZID DOI {} failed for article.pk: {}...'.format(action, article.pk))
-        logger.error(ezid_result.msg)
+        if ezid_result != None:
+            logger.error(ezid_result.msg)
 
     return False, ezid_result
 
