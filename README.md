@@ -14,22 +14,55 @@ The plugin is triggered by the `preprint_publication` event. This event happens 
 
 ## Configuration
 
-The following keys need to be added, with appropriate values, to the settings.py file you're using for your Janeway installation:
+Configuration for preprints and journals is slightly different because preprints don't support the internal settings
+substructure that allows for press-wide defaults.
 
-```
-# EZID settings
-EZID_SHOULDER = 'doi:10.15697/'
-EZID_USERNAME = 'valid_username'
-EZID_PASSWORD = 'valid_password'
-EZID_ENDPOINT_URL = 'https://uc3-ezidx2-stg.cdlib.org'
-EZID_OWNER = 'account-name-of-whomever-should-be-billed'
-# ezid production URL is: https://ezid.cdlib.org
-# ezid staging URL is: https://uc3-ezidx2-stg.cdlib.org
-```
+### Preprints
+
+Each preprint repository needs to have an associated EZID Repo Settings object.
+
+1. Navigate to admin and find the "EZID" section
+1. Click "Add" Repo EZID settings
+1. Select the appropriate repository and fill in the shoulder, owner, username, password, and endpoint url
+1. Save
+
+### Journals
+
+Upon creation of a new press you should setup default values for EZID settings.
+
+1. Go to press manager https://<your-domain>/manager
+1. Click "Edit Journal Default Settings"
+1. Search for "ezid"
+1. EZID is enabled by default but may be changed press-wide or overriden per journal
+1. Fill in valid endpoint_url, username and password
+
+The EZID plugin also uses 3 values from the crossref settings and 1 other DOI-related setting you may choose to set press defaults for these
+or set them only on a per journal basis.
+
+1. Crossref depositor name
+1. Crossref depositor email
+1. Crossref registrant name
+1. Article DOI Pattern
+
+To override EZID settings for a particular journal:
+
+1. Go to journal dashboard > "Manager" > "All Settings"
+1. Search for "ezid"
+1. Create an override for each setting you want to override from the default
+
 
 ## Usage
 
+### Preprints 
+
 When installed and configured, the plugin will mint DOIs and add them to the system-created `preprint_doi` field for each newly-accepted preprint. Errors are logged.
+
+### Journals
+
+When an article is pushed to eScholarship with the janeway to escholarship plugin if the ezid plugin is installed and configured a doi is registered. DOIs are generated based on the Article DOI Pattern setting which is in line with Janeway functionality with Crossref.  There are also management commands that allow you to manually register or update a DOI associated with an article.
+
+`register_journal_ezid_doi <article_id>`
+`update_journal_ezid_doi <article_id>`
 
 ## Contributing
 

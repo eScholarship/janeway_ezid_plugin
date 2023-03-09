@@ -1,0 +1,63 @@
+[
+    {
+      "group": {
+        "name": "plugin:ezid"
+      },
+      "setting": {
+        "description": "Enables and disables EZID plugin for this journal",
+        "is_translatable": false,
+        "name": "ezid_plugin_enable",
+        "pretty_name": "Enable EZID Plugin",
+        "type": "boolean"
+      },
+      "value": {
+        "default": "on"
+      }
+    },
+    {
+        "group": {
+          "name": "plugin:ezid"
+        },
+        "setting": {
+          "description": "EZID username to register DOIs",
+          "is_translatable": false,
+          "name": "ezid_plugin_username",
+          "pretty_name": "EZID username",
+          "type": "char"
+        },
+        "value": {
+          "default": ""
+        }
+      },
+      {
+        "group": {
+          "name": "plugin:ezid"
+        },
+        "setting": {
+          "description": "EZID password to register DOIs",
+          "is_translatable": false,
+          "name": "ezid_plugin_password",
+          "pretty_name": "EZID password",
+          "type": "char"
+        },
+        "value": {
+          "default": ""
+        }
+      },
+      {
+        "group": {
+          "name": "plugin:ezid"
+        },
+        "setting": {
+          "description": "EZID endpoint URL to register DOIs",
+          "is_translatable": false,
+          "name": "ezid_plugin_endpoint_url",
+          "pretty_name": "EZID endpoint URL",
+          "type": "char"
+        },
+        "value": {
+          "default": ""
+        }
+      }
+]
+  

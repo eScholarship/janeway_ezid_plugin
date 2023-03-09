@@ -16,7 +16,7 @@ PLUGIN_NAME = 'EZID DOI Plugin'
 DISPLAY_NAME = 'EZID DOI'
 DESCRIPTION = 'Use EZID to deposit DOIs for preprints in Janeway.'
 AUTHOR = 'California Digital Library'
-VERSION = '0.2'
+VERSION = '0.3'
 SHORT_NAME = 'ezid'
 MANAGER_URL = 'ezid_manager'
 JANEWAY_VERSION = "1.3.8"
@@ -51,6 +51,11 @@ def install():
 
     else:
         print('Plugin {0} is already installed.'.format(PLUGIN_NAME))
+
+    update_settings(
+        file_path="plugins/ezid/install/settings.json"
+    )
+
 
 def register_for_events():
     '''register for events '''
