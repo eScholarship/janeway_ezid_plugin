@@ -23,10 +23,6 @@ from .models import RepoEZIDSettings
 
 logger = get_logger(__name__)
 
-USERNAME = settings.EZID_USERNAME
-PASSWORD = settings.EZID_PASSWORD
-ENDPOINT_URL = settings.EZID_ENDPOINT_URL
-
 # disable to too many branches warning for PyLint
 # pylint: disable=R0912
 
@@ -376,12 +372,15 @@ def preprint_publication(**kwargs):
 #     logger.debug("preprint.id = " + preprint.id)
 #     logger.debug("request: " + request)
 
+def get_setting(name, journal):
+    return setting_handler.get_setting('plugin:ezid', name, journal).processed_value
+
 def get_journal_metadata(article):
     target_url = article.remote_url
 
-    ezid_config = { 'username': USERNAME,
-                    'password': PASSWORD,
-                    'endpoint_url': ENDPOINT_URL,
+    ezid_config = { 'username': get_setting('ezid_plugin_username', article.journal),
+                    'password': get_setting('ezid_plugin_password', article.journal),
+                    'endpoint_url': get_setting('ezid_plugin_endpoint_url', article.journal),
                     'owner': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,}
     ezid_metadata = {'target_url': target_url,
                      'article': article,
@@ -405,20 +404,26 @@ def process_ezid_result(article, action, ezid_result):
         if ezid_result != None:
             logger.error(ezid_result.msg)
 
-    return False, ezid_result
+    return True, False, ezid_result
 
 def update_journal_doi(article):
-    ezid_config, ezid_metadata = get_journal_metadata(article)
+    if get_setting('ezid_plugin_username', article.journal):
+        ezid_config, ezid_metadata = get_journal_metadata(article)
 
-    ezid_metadata['update_id'] = article.get_doi()
+        ezid_metadata['update_id'] = article.get_doi()
 
-    ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
+        ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
 
-    return process_ezid_result(article, "update", ezid_result)
+        return process_ezid_result(article, "update", ezid_result)
+    else:
+        return False, False, ""
 
 def register_journal_doi(article):
-    ezid_config, ezid_metadata = get_journal_metadata(article)
+    if get_setting('ezid_plugin_username', article.journal) == 'on':
+        ezid_config, ezid_metadata = get_journal_metadata(article)
 
-    ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
+        ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
 
-    return process_ezid_result(article, "creation", ezid_result)
+        return process_ezid_result(article, "creation", ezid_result)
+    else:
+        return False, False, ""
