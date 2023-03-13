@@ -30,7 +30,7 @@ Each preprint repository needs to have an associated EZID Repo Settings object.
 
 Upon creation of a new press you should setup default values for EZID settings.
 
-1. Go to press manager https://<your-domain>/manager
+1. Go to press manager https://your-domain/manager
 1. Click "Edit Journal Default Settings"
 1. Search for "ezid"
 1. EZID is enabled by default but may be changed press-wide or overriden per journal
