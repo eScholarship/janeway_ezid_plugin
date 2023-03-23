@@ -61,8 +61,8 @@ When installed and configured, the plugin will mint DOIs and add them to the sys
 
 When an article is pushed to eScholarship with the janeway to escholarship plugin if the ezid plugin is installed and configured a doi is registered. DOIs are generated based on the Article DOI Pattern setting which is in line with Janeway functionality with Crossref.  There are also management commands that allow you to manually register or update a DOI associated with an article.
 
-`register_journal_ezid_doi <article_id>`
-`update_journal_ezid_doi <article_id>`
+* `register_journal_ezid_doi <article_id>`
+* `update_journal_ezid_doi <article_id>`
 
 ## Contributing
 
