@@ -395,7 +395,7 @@ def process_ezid_result(article, action, ezid_result):
         if ezid_result.startswith('success:'):
             doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
             logger.debug('DOI {} success: {}'.format(action, doi))
-            return True, ezid_result
+            return True, True, ezid_result
         else:
             logger.error('EZID DOI {} failed for article.pk: {}...'.format(action, article.pk))
             logger.error('ezid_result: ' + ezid_result)
@@ -407,7 +407,7 @@ def process_ezid_result(article, action, ezid_result):
     return True, False, ezid_result
 
 def update_journal_doi(article):
-    if get_setting('ezid_plugin_username', article.journal):
+    if get_setting('ezid_plugin_enable', article.journal):
         ezid_config, ezid_metadata = get_journal_metadata(article)
 
         ezid_metadata['update_id'] = article.get_doi()
@@ -419,7 +419,7 @@ def update_journal_doi(article):
         return False, False, ""
 
 def register_journal_doi(article):
-    if get_setting('ezid_plugin_username', article.journal) == 'on':
+    if get_setting('ezid_plugin_enable', article.journal):
         ezid_config, ezid_metadata = get_journal_metadata(article)
 
         ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
