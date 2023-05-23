@@ -3,7 +3,7 @@ from django.db import models
 from repository.models import Repository
 
 class RepoEZIDSettings(models.Model):
-    repo = models.OneToOneField(Repository)
+    repo = models.OneToOneField(Repository, on_delete=models.CASCADE)
     ezid_shoulder = models.CharField(max_length=50)
     ezid_owner = models.CharField(max_length=50)
     ezid_username = models.CharField(max_length=200)
