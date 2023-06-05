@@ -417,8 +417,11 @@ def update_journal_doi(article):
     return process_ezid_result(article, "update", ezid_result)
 
 def register_journal_doi(article):
-    ezid_config, ezid_metadata = get_journal_metadata(article)
+    # To prevent percent-decode error from EZID 
+    article.title = article.title.replace('%','%25')
+    article.abstract = article.abstract.replace('%','%25')
 
+    ezid_config, ezid_metadata = get_journal_metadata(article)
     ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
 
     return process_ezid_result(article, "creation", ezid_result)
