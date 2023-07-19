@@ -16,7 +16,8 @@
             <journal_metadata>
                 <full_title>{{ article.journal.name }}</full_title>
                 <abbrev_title>{{ article.journal.name }}</abbrev_title>
-                {% if article.journal.issn %}
+                # only include the ISSN if it's not the default value and it exists
+                {% if article.journal.issn and article.journal.issn != '0000-0000' %}
                 <issn media_type="electronic">{{ article.journal.issn }}</issn>
                 {% endif %}
             </journal_metadata>
