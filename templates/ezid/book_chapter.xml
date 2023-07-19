@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doi_batch xmlns="http://www.crossref.org/schema/5.3.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1"
+    xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
+	<head>
+		<doi_batch_id>{{ article.journal.name|cut:" " }}_{{now|date:"Ymd"}}_{{ article.pk}}</doi_batch_id>
+		<timestamp>{{ now|date:"U" }}</timestamp>
+		<depositor>
+			<depositor_name>{{ depositor_name }}</depositor_name>
+			<email_address>{{ depositor_email }}</email_address>
+		</depositor>
+		<registrant>{{ registrant }}</registrant>
+	</head>
+	<body>
+		<book book_type="edited_book">
+			<book_series_metadata language="en">
+				<series_metadata>
+					<titles>
+						<title>{{ article.journal.name }}</title>
+					</titles>
+					<issn>{{ article.journal.issn }}</issn>
+				</series_metadata>
+				<titles>
+					<title>{{ article.journal.name }}</title>
+				</titles>
+				<publication_date media_type="online">
+					<year>{{ article.issue.date.year }}</year>
+				</publication_date>
+				<noisbn reason="archive_volume"/>
+				<publisher>
+					<publisher_name>eScholarship Publishing</publisher_name>
+					<publisher_place>Oakland,CA</publisher_place>
+				</publisher>
+			</book_series_metadata>
+			<content_item component_type="chapter" publication_type="full_text" language="en">
+				<contributors>
+					{% for a in article.frozen_authors.all %}
+					<person_name contributor_role="author" sequence="{% if a.order == 0 %}first{% else %}additional{% endif %}">
+						<given_name>{{ a.given_names }}</given_name>
+						<surname>{{ a.last_name }}</surname>
+						{% if a.orcid %}
+						<ORCID>https://orcid.org/{{ a.orcid }}</ORCID>
+						{% endif %}
+					</person_name>
+					{% endfor %}
+				</contributors>
+				<titles>
+					<title>{{ article.title|striptags|escape }}</title>
+				</titles>
+				{% if article.abstract %}
+				<abstract xmlns="http://www.ncbi.nlm.nih.gov/JATS1">
+					<p>{{ article.abstract|striptags|escape }}</p>
+				</abstract>
+				{% endif %}
+				<publication_date  media_type="online">
+					<month>{{ article.date_published.month }}</month>
+					<day>{{ article.date_published.day }}</day>
+					<year>{{ article.date_published.year }}</year>
+				</publication_date>
+				<doi_data>
+					<doi>{{ article.get_doi }}</doi>
+					<resource>{{ target_url }}</resource>
+				</doi_data>
+			</content_item>
+		</book>
+	</body>
+</doi_batch>
