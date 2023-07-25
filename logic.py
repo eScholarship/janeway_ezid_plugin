@@ -416,8 +416,8 @@ def update_journal_doi(article):
 
         ezid_metadata['update_id'] = article.get_doi()
 
-        junit = JournalUnit.objects.get(journal=article.journal)
-        if junit and junit.ezid_template and 'BC' in junit.ezid_template:    
+        if get_setting('ezid_book_chapter', article.journal):
+            print("Using BOOK CHAPTER")
             ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/book_chapter.xml')
         else:
             ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
@@ -432,8 +432,8 @@ def register_journal_doi(article):
         article.title = article.title.replace('%','%25')
         article.abstract = article.abstract.replace('%','%25')
         ezid_config, ezid_metadata = get_journal_metadata(article)
-        junit = JournalUnit.objects.get(journal=article.journal)
-        if junit and junit.ezid_template and 'BC' in junit.ezid_template:    
+        if get_setting('ezid_book_chapter', article.journal):
+            print("Using BOOK CHAPTER")
             ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/book_chapter.xml')
         else:
             ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
