@@ -58,6 +58,21 @@
         "value": {
           "default": ""
         }
+      },
+      {
+       "group": {
+         "name": "plugin:ezid"
+       },
+       "setting": {
+         "description": "Enables and disables book chapter for this journal",
+         "is_translatable": false,
+         "name": "ezid_book_chapter",
+         "pretty_name": "Enable Book Chapter",
+         "type": "boolean"
+       },
+       "value": {
+         "default": "off"
+       }
       }
 ]
   
