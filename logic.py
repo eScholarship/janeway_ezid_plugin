@@ -20,7 +20,6 @@ from utils.logger import get_logger
 from utils import setting_handler
 
 from .models import RepoEZIDSettings
-from plugins.eschol.models import JournalUnit
 
 logger = get_logger(__name__)
 
@@ -417,7 +416,7 @@ def update_journal_doi(article):
         ezid_metadata['update_id'] = article.get_doi()
 
         if get_setting('ezid_book_chapter', article.journal):
-            print("Using BOOK CHAPTER")
+            #print("Using BOOK CHAPTER")
             ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/book_chapter.xml')
         else:
             ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
@@ -433,7 +432,7 @@ def register_journal_doi(article):
         article.abstract = article.abstract.replace('%','%25')
         ezid_config, ezid_metadata = get_journal_metadata(article)
         if get_setting('ezid_book_chapter', article.journal):
-            print("Using BOOK CHAPTER")
+            #print("Using BOOK CHAPTER")
             ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/book_chapter.xml')
         else:
             ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
