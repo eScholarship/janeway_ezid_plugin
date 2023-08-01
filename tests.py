@@ -8,7 +8,7 @@ from utils import setting_handler
 
 from .logic import get_journal_metadata
 
-class EZIDTest(TestCase):
+class EZIDJournalTest(TestCase):
     def setUp(self):
         call_command('install_plugins', 'ezid')
         #call_command('migrate', 'ezid')
@@ -49,9 +49,6 @@ class EZIDTest(TestCase):
         metadata['title'] = "This is the test title"
 
         cref_xml = render_to_string('ezid/journal_content.xml', metadata)
-        print(cref_xml)
         self.assertIn(metadata['title'], cref_xml)
         self.assertNotIn(self.article.title, cref_xml)
         self.assertNotIn("abstract", cref_xml)
-
-
