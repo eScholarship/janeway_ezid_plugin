@@ -289,6 +289,52 @@ def create_doi_via_ezid(ezid_config, ezid_metadata, template):
 
     return send_create_request(payload, ezid_metadata['doi'], ezid_config['username'], ezid_config['password'], ezid_config['endpoint_url'])
 
+def get_date_dict(d):
+    if d:
+        return {'month': d.month, 'day': d.day, 'year': d.year}
+    return None
+
+# some notes on the metatdata required:
+# [x] target_url (direct link to preprint)
+# [x] group_title ( preprint.subject.values_list()[0][2] ) grab the first subject
+# [x] contributors - needs to be a list, with a dictionary per row:
+# "person_name": [{"@sequence": "first", "@contributor_role": "author", "given_name": "Hardy", "surname": "Pottinger", "ORCID": "https://orcid.org/0000-0001-8549-9354"},]
+# (preprint.preprintauthor_set is an object ref, work with it, preprintauthor_set.all() would get you a list of all authors)
+# [x] title (preprint.title)
+# [x] posted_date (preprint.date_published, is a datetime object)
+# [x] acceptance_date (preprint.date_accepted, is a datetime object)
+def get_preprint_metadata(preprint):
+    target_url = preprint.url
+
+    group_title = preprint.subject.values_list()[0][2]
+    title = escape_str(preprint.title)
+    published_doi = preprint.doi
+    abstract = escape_str(preprint.abstract)
+    accepted_date = get_date_dict(preprint.date_accepted)
+    published_date = get_date_dict(preprint.date_published)
+
+    contributors = normalize_author_metadata(preprint.preprintauthor_set.all())
+
+    logger.debug("preprint url: " + target_url)
+    logger.debug("title: " + title)
+    logger.debug("group_title: " + group_title)
+    logger.debug("contributors: " + json.dumps(contributors))
+    logger.debug("accepted_date: " + json.dumps(accepted_date))
+    logger.debug("published_date: " + json.dumps(published_date))
+
+    # prepare two dictionaries to feed into the mint_doi_via_ezid function
+    ezid_settings = RepoEZIDSettings.objects.get(repo=preprint.repository)
+    ezid_config = {'shoulder': ezid_settings.ezid_shoulder,
+                   'username': ezid_settings.ezid_username,
+                   'password': ezid_settings.ezid_password,
+                   'endpoint_url': ezid_settings.ezid_endpoint_url,
+                   'owner': ezid_settings.ezid_owner}
+    ezid_metadata = {'target_url': target_url, 'group_title': group_title, 'contributors': contributors, 'title': title, 'published_date': published_date, 'accepted_date': accepted_date, 'published_doi': published_doi, 'abstract': abstract}
+    logger.debug('ezid_config: ' + json.dumps(ezid_config))
+    logger.debug('ezid_metadata: '+ json.dumps(ezid_metadata))
+
+    return ezid_config, ezid_metadata
+
 def preprint_publication(**kwargs):
     ''' hook script for the preprint_publication event '''
     logger.debug('>>> preprint_publication called, mint an EZID DOI...')
@@ -303,49 +349,9 @@ def preprint_publication(**kwargs):
         logger.debug('No need to mint a new DOI, skipping.')
         return None
 
-    # gather metadata required for minting a DOI via EZID
-    target_url = preprint.url
-
-    group_title = preprint.subject.values_list()[0][2]
-    title = escape_str(preprint.title)
-    published_doi = preprint.doi
-    abstract = escape_str(preprint.abstract)
-    accepted_date = {'month':preprint.date_accepted.month, 'day':preprint.date_accepted.day, 'year':preprint.date_accepted.year}
-    published_date = {'month':preprint.date_published.month, 'day':preprint.date_published.day, 'year':preprint.date_published.year}
-
-    contributors = normalize_author_metadata(preprint.preprintauthor_set.all())
-
-    #some notes on the metatdata required:
-    # [x] target_url (direct link to preprint)
-    # [x] group_title ( preprint.subject.values_list()[0][2] ) grab the first subject
-    # [x] contributors - needs to be a list, with a dictionary per row:
-    # "person_name": [{"@sequence": "first", "@contributor_role": "author", "given_name": "Hardy", "surname": "Pottinger", "ORCID": "https://orcid.org/0000-0001-8549-9354"},]
-    # (preprint.preprintauthor_set is an object ref, work with it, preprintauthor_set.all() would get you a list of all authors)
-    # [x] title (preprint.title)
-    # [x] posted_date (preprint.date_published, is a datetime object)
-    # [x] acceptance_date (preprint.date_accepted, is a datetime object)
-
-    logger.debug("preprint url: " + target_url)
-    logger.debug("title: " + title)
-    logger.debug("group_title: " + group_title)
-    logger.debug("contributors: " + json.dumps(contributors))
-    logger.debug("accepted_date: " + json.dumps(accepted_date))
-    logger.debug("published_date: " + json.dumps(published_date))
+    ezid_config, ezid_metadata = get_preprint_metadata(preprint)
 
     logger.debug('BEGIN MINTING REQUEST...')
-
-    # prepare two dictionaries to feed into the mint_doi_via_ezid function
-
-    ezid_settings = RepoEZIDSettings.objects.get(repo=preprint.repository)
-    ezid_config = {'shoulder': ezid_settings.ezid_shoulder,
-                   'username': ezid_settings.ezid_username,
-                   'password': ezid_settings.ezid_password,
-                   'endpoint_url': ezid_settings.ezid_endpoint_url,
-                   'owner': ezid_settings.ezid_owner}
-    ezid_metadata = {'target_url': target_url, 'group_title': group_title, 'contributors': contributors, 'title': title, 'published_date': published_date, 'accepted_date': accepted_date, 'published_doi': published_doi, 'abstract': abstract}
-
-    logger.debug('ezid_config: ' + json.dumps(ezid_config))
-    logger.debug('ezid_metadata: '+ json.dumps(ezid_metadata))
 
     ezid_result = mint_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/posted_content.xml')
 
