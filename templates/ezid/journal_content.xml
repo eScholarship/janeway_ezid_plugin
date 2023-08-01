@@ -34,7 +34,7 @@
             </journal_issue>
             <journal_article publication_type="full_text">
                 <titles>
-                    <title>{{ article.title|striptags|escape }}</title>
+                    <title>{{ title|striptags|escape }}</title>
                 </titles>
                 {% if article.frozen_authors.exists %}
                 <contributors>
@@ -49,9 +49,9 @@
                     {% endfor %}
                  </contributors>
                  {% endif %}
-                 {% if article.abstract %}
+                 {% if abstract %}
                  <abstract xmlns="http://www.ncbi.nlm.nih.gov/JATS1">
-                    <p>{{ article.abstract|striptags|escape }}</p>
+                    <p>{{ abstract|striptags|escape }}</p>
                   </abstract>
                  {% endif %}
                 <publication_date media_type="online">

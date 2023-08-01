@@ -77,6 +77,10 @@ def normalize_author_metadata(preprint_authors):
 
     return author_list
 
+def escape_str(s):
+    # To prevent percent-decode error from EZID
+    return s.replace('%','%25') if s else s
+
 class EzidHTTPErrorProcessor(urlreq.HTTPErrorProcessor):
     ''' Error Processor, required to let 201 responses pass '''
     def http_response(self, request, response):
@@ -303,12 +307,11 @@ def preprint_publication(**kwargs):
     target_url = preprint.url
 
     group_title = preprint.subject.values_list()[0][2]
-    title = preprint.title.replace('%', '%25')
+    title = escape_str(preprint.title)
     published_doi = preprint.doi
-    abstract = preprint.abstract.replace('%', '%25')
+    abstract = escape_str(preprint.abstract)
     accepted_date = {'month':preprint.date_accepted.month, 'day':preprint.date_accepted.day, 'year':preprint.date_accepted.year}
     published_date = {'month':preprint.date_published.month, 'day':preprint.date_published.day, 'year':preprint.date_published.year}
-
 
     contributors = normalize_author_metadata(preprint.preprintauthor_set.all())
 
@@ -384,6 +387,8 @@ def get_journal_metadata(article):
                     'owner': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,}
     ezid_metadata = {'target_url': target_url,
                      'article': article,
+                     'title': escape_str(article.title),
+                     'abstract': escape_str(article.abstract),
                      'doi': article.get_doi(),
                      'depositor_name': setting_handler.get_setting('Identifiers', 'crossref_name', article.journal).processed_value,
                      'depositor_email': setting_handler.get_setting('Identifiers', 'crossref_email', article.journal).processed_value,
@@ -408,9 +413,6 @@ def process_ezid_result(article, action, ezid_result):
 
 def update_journal_doi(article):
     if get_setting('ezid_plugin_enable', article.journal):
-        # To prevent percent-decode error from EZID
-        article.title = article.title.replace('%','%25')
-        article.abstract = article.abstract.replace('%','%25')
         ezid_config, ezid_metadata = get_journal_metadata(article)
 
         ezid_metadata['update_id'] = article.get_doi()
@@ -427,9 +429,6 @@ def update_journal_doi(article):
 
 def register_journal_doi(article):
     if get_setting('ezid_plugin_enable', article.journal):
-        # To prevent percent-decode error from EZID
-        article.title = article.title.replace('%','%25')
-        article.abstract = article.abstract.replace('%','%25')
         ezid_config, ezid_metadata = get_journal_metadata(article)
         if get_setting('ezid_book_chapter', article.journal):
             #print("Using BOOK CHAPTER")
