@@ -19,7 +19,7 @@ from django.template.loader import render_to_string
 from utils.logger import get_logger
 from utils import setting_handler
 
-from .models import RepoEZIDSettings
+from plugins.ezid.models import RepoEZIDSettings
 
 logger = get_logger(__name__)
 
