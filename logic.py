@@ -424,7 +424,6 @@ def update_journal_doi(article):
         ezid_metadata['update_id'] = article.get_doi()
 
         if get_setting('ezid_book_chapter', article.journal):
-            #print("Using BOOK CHAPTER")
             ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/book_chapter.xml')
         else:
             ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
@@ -437,10 +436,9 @@ def register_journal_doi(article):
     if get_setting('ezid_plugin_enable', article.journal):
         ezid_config, ezid_metadata = get_journal_metadata(article)
         if get_setting('ezid_book_chapter', article.journal):
-            #print("Using BOOK CHAPTER")
             ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/book_chapter.xml')
         else:
             ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
         return process_ezid_result(article, "creation", ezid_result)
     else:
-        return False, False, ""
+        return False, False, f"EZID not enabled for {article.journal}"
