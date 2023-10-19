@@ -4,7 +4,7 @@ Janeway Management command for updating metadata for existing DOIs for the EZID 
 
 import re
 from urllib.parse import urlparse
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from plugins.ezid import logic as ezid
 from repository import models
 from press import models as press_models
@@ -28,39 +28,29 @@ class Command(BaseCommand):
         short_name = options.get('short_name')
         preprint_id = options['preprint_id']
 
-        self.stdout.write("Attempting to update DOI metadata for preprint " + preprint_id)
+        self.stdout.write(f"Attempting to update DOI metadata for preprint {preprint_id}")
 
         try:
-            repo = models.Repository.objects.get(
-                short_name=short_name,
-            )
+            repo = models.Repository.objects.get(short_name=short_name)
         except models.Repository.DoesNotExist:
-            exit('No repository found.')
+            raise CommandError('No repository found.')
 
         # determine whether we've been given a DOI, and if so, find the matching preprint
         if preprint_id.startswith('http'):
-            # pdb.set_trace()
             try:
                 # get the preprint that matches the provided preprint_doi(in the preprint_id param)
                 doiURL = urlparse(preprint_id)
-                # pdb.set_trace()
                 # grab just the path from the provided URL, and chop off the first character, BOOM, there's your DOI
                 preprint_doi = doiURL.path[1:]
-
                 preprint = models.Preprint.objects.get(repository=repo, preprint_doi=preprint_doi)
-
             except models.Preprint.DoesNotExist:
-                exit('No preprint found with preprint_doi=' + preprint_id)
+                raise CommandError('No preprint found with preprint_doi=' + preprint_id)
         else:
             try:
                 # get the preprint that matches the provided preprint_id
                 preprint = models.Preprint.objects.get(repository=repo, pk=preprint_id)
             except models.Preprint.DoesNotExist:
-                exit('No preprint found with preprint_id=' + preprint_id)
-
-
-        #debug breakpoint, use to inspect the objects instantiated above
-        # pdb.set_trace()
+                raise CommandError(f'No preprint found with preprint_id={preprint_id}')
 
         # reasons we should not even try to mint a DOI...
         # 1) there's already a DOI, 2) the preprint has not been published
@@ -122,10 +112,10 @@ class Command(BaseCommand):
         if isinstance(ezid_result, str):
             if ezid_result.startswith('success:'):
                 updated_doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
-                self.stdout.write(self.style.SUCCESS('DOI metadata successfully updated: ' + updated_doi))
+                self.stdout.write(self.style.SUCCESS(f'DOI metadata successfully updated: {updated_doi}'))
             else:
-                self.stdout.write(self.style.ERROR('EZID DOI creation failed for preprint.pk: ' + preprint.pk + ' ...'))
-                self.stdout.write(self.style.ERROR('ezid_result: ' + ezid_result))
+                self.stdout.write(self.style.ERROR(f'EZID DOI creation failed for preprint.pk: {preprint.pk} ...'))
+                self.stdout.write(self.style.ERROR(f'ezid_result: {ezid_result}'))
         else:
-            self.stdout.write(self.style.ERROR('EZID DOI creation failed for preprint.pk: ' + preprint.pk + ' ...'))
+            self.stdout.write(self.style.ERROR(f'EZID DOI creation failed for preprint.pk: {preprint.pk} ...'))
             self.stdout.write(self.style.ERROR(ezid_result.msg))

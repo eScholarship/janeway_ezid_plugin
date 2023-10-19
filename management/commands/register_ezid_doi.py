@@ -3,11 +3,10 @@ Janeway Management command for registering DOIs for the EZID plugin
 """
 
 import re
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from plugins.ezid import logic as ezid
 from repository import models
 from press import models as press_models
-# import pdb #uncomment this for troubleshooting
 
 from plugins.ezid.models import RepoEZIDSettings
 
@@ -27,27 +26,27 @@ class Command(BaseCommand):
         short_name = options.get('short_name')
         preprint_id = options['preprint_id']
 
-        self.stdout.write("Attempting to mint a DOI for preprint_id=" + preprint_id)
+        self.stdout.write(f"Attempting to mint a DOI for preprint_id={preprint_id}")
 
         try:
             repo = models.Repository.objects.get(
                 short_name=short_name,
             )
         except models.Repository.DoesNotExist:
-            exit('No repository found.')
+            raise CommandError('No repository found.')
 
         try:
             # get the preprint that matches the provided preprint_id
             preprint = models.Preprint.objects.get(repository=repo, pk=preprint_id)
         except models.Preprint.DoesNotExist:
-            exit('No preprint found with preprint_id=' + preprint_id)
+            raise CommandError(f'No preprint found with preprint_id={preprint_id}')
 
         # reasons we should not even try to mint a DOI...
         # 1) there's already a DOI, 2) the preprint has not been published
         if preprint.preprint_doi:
-            raise RuntimeError("Preprint " + preprint_id + " already has a DOI, if you wish to update the DOI metadata for this preprint, try the update_ezid_doi command instead.")
+            raise CommandError(f"Preprint {preprint_id} already has a DOI, if you wish to update the DOI metadata for this preprint, try the update_ezid_doi command instead.")
         if not preprint.is_published():
-            raise RuntimeError("Preprint " + preprint_id + " is not yet published, cannot mint a DOI for an unpublished preprint.")
+            raise CommandError(f"Preprint {preprint_id} is not yet published, cannot mint a DOI for an unpublished preprint.")
 
         # gather metadata required for minting a DOI via EZID
         # site_url = repo.site_url()
@@ -68,9 +67,6 @@ class Command(BaseCommand):
         published_date = {'month':preprint.date_published.month, 'day':preprint.date_published.day, 'year':preprint.date_published.year}
 
         contributors = ezid.normalize_author_metadata(preprint.preprintauthor_set.all())
-
-        #debug breakpoint, use to confirm the metadata gathered above
-        # pdb.set_trace()
 
         ezid_settings = RepoEZIDSettings.objects.get(repo=repo)
 
@@ -94,13 +90,13 @@ class Command(BaseCommand):
         if isinstance(ezid_result, str):
             if ezid_result.startswith('success:'):
                 new_doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
-                self.stdout.write(self.style.SUCCESS('DOI successfully created: ' + new_doi))
+                self.stdout.write(self.style.SUCCESS(f'DOI successfully created: {new_doi}'))
                 preprint.preprint_doi = new_doi
                 preprint.save()
                 self.stdout.write(self.style.SUCCESS('✅ DOI added to preprint Janeway object and saved.'))
             else:
-                self.stdout.write(self.style.ERROR('EZID DOI creation failed for preprint.pk: ' + preprint.pk + ' ...'))
-                self.stdout.write(self.style.ERROR('ezid_result: ' + ezid_result))
+                self.stdout.write(self.style.ERROR(f'EZID DOI creation failed for preprint.pk: {preprint.pk} ...'))
+                self.stdout.write(self.style.ERROR(f'ezid_result: {ezid_result}'))
         else:
-            self.stdout.write(self.style.ERROR('EZID DOI creation failed for preprint.pk: ' + str(preprint.pk) + ' ...'))
+            self.stdout.write(self.style.ERROR(f'EZID DOI creation failed for preprint.pk: {preprint.pk} ...'))
             self.stdout.write(self.style.ERROR(ezid_result.msg))
