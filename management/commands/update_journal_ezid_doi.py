@@ -25,7 +25,7 @@ class Command(BaseCommand):
         enabled, success, msg = logic.update_journal_doi(article)
 
         if not enabled:
-            self.stdout.write(self.style.INFO(msg))
+            self.stdout.write(self.style.WARNING(msg))
         elif not success:
             self.stdout.write(self.style.ERROR(msg))
         else:
