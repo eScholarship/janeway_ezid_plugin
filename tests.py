@@ -22,7 +22,7 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('Identifiers', 'crossref_registrant', self.journal, "crossref_registrant")
 
     def test_journal_metadata(self):
-        config, metadata = get_journal_metadata(self.article)
+        metadata = get_journal_metadata(self.article)
         self.assertEqual(metadata["target_url"], "https://test.org/qtXXXXXX")
         self.assertEqual(metadata["title"], self.article.title)
         self.assertIsNone(metadata["abstract"])
@@ -35,7 +35,7 @@ class EZIDJournalTest(TestCase):
         self.article.title = "This is the title with a %"
         self.article.save()
 
-        config, metadata = get_journal_metadata(self.article)
+        metadata = get_journal_metadata(self.article)
         self.assertEqual(metadata["target_url"], "https://test.org/qtXXXXXX")
         self.assertEqual(metadata["title"], "This is the title with a %25")
         self.assertIsNone(metadata["abstract"])
@@ -45,7 +45,7 @@ class EZIDJournalTest(TestCase):
         self.assertEqual(metadata["registrant"], "crossref_registrant")
 
     def test_journal_template(self):
-        config, metadata = get_journal_metadata(self.article)
+        metadata = get_journal_metadata(self.article)
         metadata['now'] = datetime(2023, 1, 1)
         metadata['title'] = "This is the test title"
 
@@ -70,27 +70,27 @@ class EZIDPreprintTest(TestCase):
                                                    ezid_endpoint_url="endpoint.org")
 
     def test_preprint_metadata(self):
-        config, metadata = get_preprint_metadata(self.preprint)
+        metadata = get_preprint_metadata(self.preprint)
         self.assertEqual(metadata["target_url"], "http://localhost/testrepo/repository/view/1/")
         self.assertEqual(metadata["title"], self.preprint.title)
         self.assertEqual(metadata["abstract"], self.preprint.abstract)
-        self.assertIsNone(metadata["published_doi"])
+        self.assertFalse("published_doi" in metadata)
         self.assertEqual(metadata["group_title"], self.subject.name)
         self.assertEqual(len(metadata["contributors"]), 1)
 
     def test_preprint_percent(self):
         self.preprint.title = "This is the title with a %"
         self.preprint.save()
-        config, metadata = get_preprint_metadata(self.preprint)
+        metadata = get_preprint_metadata(self.preprint)
         self.assertEqual(metadata["target_url"], "http://localhost/testrepo/repository/view/2/")
         self.assertEqual(metadata["title"], "This is the title with a %25")
         self.assertEqual(metadata["abstract"], self.preprint.abstract)
-        self.assertIsNone(metadata["published_doi"])
+        self.assertFalse("published_doi" in metadata)
         self.assertEqual(metadata["group_title"], self.subject.name)
         self.assertEqual(len(metadata["contributors"]), 1)
 
     def test_preprint_template(self):
-        config, metadata = get_preprint_metadata(self.preprint)
+        metadata = get_preprint_metadata(self.preprint)
         metadata['now'] = datetime(2023, 1, 1)
 
         cref_xml = render_to_string('ezid/posted_content.xml', metadata)
