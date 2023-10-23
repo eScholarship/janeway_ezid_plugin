@@ -78,6 +78,22 @@ def get_date_dict(d):
         return {'month': d.month, 'day': d.day, 'year': d.year}
     return None
 
+def is_valid_issn(issn):
+    if not issn or issn == "0000-0000":
+        return False
+
+    r = re.compile("^[0-9]{4}-[0-9]{3}[0-9X]$")
+
+    return re.search(r, issn)
+
+def is_valid_url(url):
+    try:
+        validator = URLValidator()
+        validator(url)
+        return True
+    except ValidationError:
+        return False
+
 class EzidHTTPErrorProcessor(urlreq.HTTPErrorProcessor):
     ''' Error Processor, required to let 201 responses pass '''
     def http_response(self, request, response):
@@ -144,11 +160,9 @@ def get_preprint_metadata(preprint):
                      'accepted_date': get_date_dict(preprint.date_accepted),
                      'abstract': escape_str(preprint.abstract)}
 
-    try:
-        validator = URLValidator()
-        validator(preprint.doi)
+    if is_valid_url(preprint.doi):
         ezid_metadata['published_doi'] = preprint.doi
-    except ValidationError:
+    else:
         logger.error(f'invalid URL, DOI: {preprint.doi} for {preprint}')
 
     return ezid_metadata
@@ -207,8 +221,11 @@ def get_journal_metadata(article):
 def get_journal_template(journal):
     return 'ezid/book_chapter.xml' if get_setting('ezid_book_chapter', journal) else 'ezid/journal_content.xml'
 
-def journal_doi(article, action):
+def journal_article_doi(article, action):
     if get_setting('ezid_plugin_enable', article.journal):
+        if not is_valid_issn(article.journal.issn) and not is_valid_url(article.journal.issn):
+            return True, False, f"Invalid ISSN {article.journal.issn} for {article.journal}"
+
         ezid_metadata = get_journal_metadata(article)
         template = get_journal_template(article.journal)
 
@@ -232,7 +249,7 @@ def journal_doi(article, action):
         return False, False, f"EZID not enabled for {article.journal}"
 
 def update_journal_doi(article):
-    return journal_doi(article, True)
+    return journal_article_doi(article, "update")
 
 def register_journal_doi(article):
-    return journal_doi(article, False)
+    return journal_article_doi(article, "register")
