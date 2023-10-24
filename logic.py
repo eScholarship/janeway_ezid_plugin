@@ -187,7 +187,12 @@ def preprint_doi(preprint, action):
     return process_ezid_result(preprint, action, ezid_result)
 
 def update_preprint_doi(preprint):
-    return preprint_doi(preprint, "update")
+    if not preprint.preprint_doi:
+        msg = f'{preprint} does not have a DOI'
+        logger.info(msg)
+        return True, False, msg
+    else:
+        return preprint_doi(preprint, "update")
 
 def mint_preprint_doi(preprint):
     if preprint.preprint_doi:
