@@ -3,15 +3,14 @@ This module contains the logic for the EZID plugin for Janeway
 """
 
 __copyright__ = "Copyright (c) 2020, The Regents of the University of California"
-__author__ = "Hardy Pottinger & Mahjabeen Yucekul"
+__author__ = "Hardy Pottinger, Mahjabeen Yucekul & Esther Verreau"
 __license__ = "BSD 3-Clause"
 __maintainer__ = "California Digital Library"
 
 import re
 from urllib.parse import quote
 import urllib.request as urlreq
-import json
-# import pdb # use for debugging
+
 from django.core.validators import URLValidator, ValidationError
 from django.conf import settings
 from django.utils import timezone
@@ -227,6 +226,8 @@ def journal_article_doi(article, action):
             return True, False, f"Invalid ISSN {article.journal.issn} for {article.journal}"
 
         ezid_metadata = get_journal_metadata(article)
+        if not ezid_metadata["doi"] and action != "mint":
+            return True, False, f"{article} not assigned a DOI"
         template = get_journal_template(article.journal)
 
         if action == "update":
@@ -235,13 +236,12 @@ def journal_article_doi(article, action):
         else:
             method = "PUT"
 
-        path = f'id/doi:{encode(ezid_metadata["doi"])}'
-
         username = get_setting('ezid_plugin_username', article.journal)
         password = get_setting('ezid_plugin_password', article.journal)
         endpoint_url = get_setting('ezid_plugin_endpoint_url', article.journal)
         owner = setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value
 
+        path = f'id/doi:{encode(ezid_metadata["doi"])}'
         payload = prepare_payload(ezid_metadata, template, ezid_metadata["target_url"], owner)
         ezid_result = send_request(method, path, payload, username, password, endpoint_url)
         return process_ezid_result(article, action, ezid_result)
