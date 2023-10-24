@@ -5,10 +5,16 @@ from django.template.loader import render_to_string
 from utils.testing import helpers
 from utils import setting_handler
 
-from .logic import get_journal_metadata, get_preprint_metadata
+import plugins.ezid.logic as logic
+
 from plugins.ezid.models import RepoEZIDSettings
 
 from datetime import datetime
+
+import mock
+from django.core.cache import cache
+
+from identifiers.models import Identifier
 
 class EZIDJournalTest(TestCase):
     def setUp(self):
@@ -20,9 +26,12 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('Identifiers', 'crossref_name', self.journal, "crossref_test")
         setting_handler.save_setting('Identifiers', 'crossref_email', self.journal, "user1@test.edu")
         setting_handler.save_setting('Identifiers', 'crossref_registrant', self.journal, "crossref_registrant")
+        setting_handler.save_setting('plugin:ezid', 'ezid_plugin_endpoint_url', self.journal, "https://test.org/")
+        setting_handler.save_setting('plugin:ezid', 'ezid_plugin_username', self.journal, "username")
+        setting_handler.save_setting('plugin:ezid', 'ezid_plugin_password', self.journal, "password")
 
     def test_journal_metadata(self):
-        metadata = get_journal_metadata(self.article)
+        metadata = logic.get_journal_metadata(self.article)
         self.assertEqual(metadata["target_url"], "https://test.org/qtXXXXXX")
         self.assertEqual(metadata["title"], self.article.title)
         self.assertIsNone(metadata["abstract"])
@@ -35,7 +44,7 @@ class EZIDJournalTest(TestCase):
         self.article.title = "This is the title with a %"
         self.article.save()
 
-        metadata = get_journal_metadata(self.article)
+        metadata = logic.get_journal_metadata(self.article)
         self.assertEqual(metadata["target_url"], "https://test.org/qtXXXXXX")
         self.assertEqual(metadata["title"], "This is the title with a %25")
         self.assertIsNone(metadata["abstract"])
@@ -45,7 +54,7 @@ class EZIDJournalTest(TestCase):
         self.assertEqual(metadata["registrant"], "crossref_registrant")
 
     def test_journal_template(self):
-        metadata = get_journal_metadata(self.article)
+        metadata = logic.get_journal_metadata(self.article)
         metadata['now'] = datetime(2023, 1, 1)
         metadata['title'] = "This is the test title"
 
@@ -53,6 +62,41 @@ class EZIDJournalTest(TestCase):
         self.assertIn(metadata['title'], cref_xml)
         self.assertNotIn(self.article.title, cref_xml)
         self.assertNotIn("abstract", cref_xml)
+
+    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    def test_update_doi(self, mock_send):
+        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
+        # if we don't clear the cache we get the old, invalid ISSN
+        cache.clear()
+        doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+
+        #path = "id/doi:10.9999/TEST"
+        #payload = 'crossref: <?xml version="1.0" encoding="UTF-8"?><doi_batch xmlns="http://www.crossref.org/schema/5.3.1"    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1"    xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">    <head>        <doi_batch_id>JournalOne_20231023_6</doi_batch_id>        <timestamp>1698086249</timestamp>        <depositor>            <depositor_name>crossref_test</depositor_name>            <email_address>user1@test.edu</email_address>        </depositor>        <registrant>crossref_registrant</registrant>    </head>    <body>        <journal>            <journal_metadata>                <full_title>Journal One</full_title>                <abbrev_title>Journal One</abbrev_title>                                                <issn media_type="electronic">1111-1111</issn>                            </journal_metadata>                        <journal_article publication_type="full_text">                <titles>                    <title>Test Article from Utils Testing Helpers</title>                </titles>                                                                  <doi_data>                                                                  <doi>10.9999/TEST</doi>                                                              <resource>https://test.org/qtXXXXXX</resource>                </doi_data>            </journal_article>        </journal>    </body></doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
+        #username = logic.get_setting('ezid_plugin_username', self.article.journal)
+        #password = logic.get_setting('ezid_plugin_password', self.article.journal)
+        #endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
+
+        enabled, success, msg = logic.register_journal_doi(self.article)
+
+        # TODO: this is not matching because of the timestamp we should be able to mock now()
+        #mock_send.assert_called_once_with("PUT", path, payload, username, password, endpoint_url)
+
+        self.assertTrue(enabled)
+        self.assertTrue(success)
+        self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
+
+    def test_no_issn(self):
+        enabled, success, msg = logic.register_journal_doi(self.article)
+
+        self.assertTrue(enabled)
+        self.assertFalse(success)
+        self.assertEqual(msg, f"Invalid ISSN {self.article.journal.issn} for {self.article.journal}")
+
+    def test_disabled(self):
+        setting_handler.save_setting('plugin:ezid', 'ezid_plugin_enable', self.article.journal, False)
+        enabled, success, msg = logic.register_journal_doi(self.article)
+
+        self.assertFalse(enabled)
 
 class EZIDPreprintTest(TestCase):
     def setUp(self):
@@ -70,7 +114,7 @@ class EZIDPreprintTest(TestCase):
                                                    ezid_endpoint_url="endpoint.org")
 
     def test_preprint_metadata(self):
-        metadata = get_preprint_metadata(self.preprint)
+        metadata = logic.get_preprint_metadata(self.preprint)
         self.assertEqual(metadata["target_url"], "http://localhost/testrepo/repository/view/1/")
         self.assertEqual(metadata["title"], self.preprint.title)
         self.assertEqual(metadata["abstract"], self.preprint.abstract)
@@ -81,7 +125,7 @@ class EZIDPreprintTest(TestCase):
     def test_preprint_percent(self):
         self.preprint.title = "This is the title with a %"
         self.preprint.save()
-        metadata = get_preprint_metadata(self.preprint)
+        metadata = logic.get_preprint_metadata(self.preprint)
         self.assertEqual(metadata["target_url"], "http://localhost/testrepo/repository/view/2/")
         self.assertEqual(metadata["title"], "This is the title with a %25")
         self.assertEqual(metadata["abstract"], self.preprint.abstract)
@@ -90,7 +134,7 @@ class EZIDPreprintTest(TestCase):
         self.assertEqual(len(metadata["contributors"]), 1)
 
     def test_preprint_template(self):
-        metadata = get_preprint_metadata(self.preprint)
+        metadata = logic.get_preprint_metadata(self.preprint)
         metadata['now'] = datetime(2023, 1, 1)
 
         cref_xml = render_to_string('ezid/posted_content.xml', metadata)
