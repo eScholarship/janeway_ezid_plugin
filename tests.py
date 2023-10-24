@@ -10,11 +10,15 @@ import plugins.ezid.logic as logic
 from plugins.ezid.models import RepoEZIDSettings
 
 from datetime import datetime
+from django.utils import timezone
 
 import mock
 from django.core.cache import cache
+from freezegun import freeze_time
 
 from identifiers.models import Identifier
+
+FROZEN_DATETIME = timezone.make_aware(timezone.datetime(2023, 1, 1, 0, 0, 0))
 
 class EZIDJournalTest(TestCase):
     def setUp(self):
@@ -63,6 +67,7 @@ class EZIDJournalTest(TestCase):
         self.assertNotIn(self.article.title, cref_xml)
         self.assertNotIn("abstract", cref_xml)
 
+    @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_update_doi(self, mock_send):
         setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
@@ -70,16 +75,17 @@ class EZIDJournalTest(TestCase):
         cache.clear()
         doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
 
-        #path = "id/doi:10.9999/TEST"
-        #payload = 'crossref: <?xml version="1.0" encoding="UTF-8"?><doi_batch xmlns="http://www.crossref.org/schema/5.3.1"    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1"    xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">    <head>        <doi_batch_id>JournalOne_20231023_6</doi_batch_id>        <timestamp>1698086249</timestamp>        <depositor>            <depositor_name>crossref_test</depositor_name>            <email_address>user1@test.edu</email_address>        </depositor>        <registrant>crossref_registrant</registrant>    </head>    <body>        <journal>            <journal_metadata>                <full_title>Journal One</full_title>                <abbrev_title>Journal One</abbrev_title>                                                <issn media_type="electronic">1111-1111</issn>                            </journal_metadata>                        <journal_article publication_type="full_text">                <titles>                    <title>Test Article from Utils Testing Helpers</title>                </titles>                                                                  <doi_data>                                                                  <doi>10.9999/TEST</doi>                                                              <resource>https://test.org/qtXXXXXX</resource>                </doi_data>            </journal_article>        </journal>    </body></doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
-        #username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        #password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        #endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
+        path = "id/doi:10.9999/TEST"
+        payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?><doi_batch xmlns="http://www.crossref.org/schema/5.3.1"    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1"    xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">    <head>        <doi_batch_id>JournalOne_20230101_{self.article.pk}</doi_batch_id>        <timestamp>1672531200</timestamp>        <depositor>            <depositor_name>crossref_test</depositor_name>            <email_address>user1@test.edu</email_address>        </depositor>        <registrant>crossref_registrant</registrant>    </head>    <body>        <journal>            <journal_metadata>                <full_title>Journal One</full_title>                <abbrev_title>Journal One</abbrev_title>                                                <issn media_type="electronic">1111-1111</issn>                            </journal_metadata>                        <journal_article publication_type="full_text">                <titles>                    <title>Test Article from Utils Testing Helpers</title>                </titles>                                                                  <doi_data>                                                                  <doi>10.9999/TEST</doi>                                                              <resource>https://test.org/qtXXXXXX</resource>                </doi_data>            </journal_article>        </journal>    </body></doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
+        username = logic.get_setting('ezid_plugin_username', self.article.journal)
+        password = logic.get_setting('ezid_plugin_password', self.article.journal)
+        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
         enabled, success, msg = logic.register_journal_doi(self.article)
 
-        # TODO: this is not matching because of the timestamp we should be able to mock now()
-        #mock_send.assert_called_once_with("PUT", path, payload, username, password, endpoint_url)
+        print(mock_send.call_args)
+
+        mock_send.assert_called_once_with("PUT", path, payload, username, password, endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
