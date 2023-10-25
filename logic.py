@@ -159,10 +159,11 @@ def get_preprint_metadata(preprint):
                      'accepted_date': get_date_dict(preprint.date_accepted),
                      'abstract': escape_str(preprint.abstract)}
 
-    if is_valid_url(preprint.doi):
-        ezid_metadata['published_doi'] = preprint.doi
-    else:
-        logger.error(f'invalid URL, DOI: {preprint.doi} for {preprint}')
+    if preprint.doi:
+        if is_valid_url(preprint.doi):
+            ezid_metadata['published_doi'] = preprint.doi
+        else:
+            logger.error(f'invalid URL, DOI: {preprint.doi} for {preprint}')
 
     return ezid_metadata
 
@@ -252,6 +253,9 @@ def journal_article_doi(article, action):
         password = get_setting('ezid_plugin_password', article.journal)
         endpoint_url = get_setting('ezid_plugin_endpoint_url', article.journal)
         owner = setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value
+
+        if not username or not password or not endpoint_url or not owner:
+            return True, False, f"EZID not fully configured for {article.journal}"
 
         path = f'id/doi:{encode(ezid_metadata["doi"])}'
         payload = prepare_payload(ezid_metadata, template, ezid_metadata["target_url"], owner)
