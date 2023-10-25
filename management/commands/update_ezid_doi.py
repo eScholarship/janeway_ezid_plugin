@@ -21,7 +21,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         short_name = options.get('short_name')
-        preprint_id = options.get('preprint_id'])
+        preprint_id = options.get('preprint_id')
 
         try:
             repo = Repository.objects.get(short_name=short_name)
