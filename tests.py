@@ -8,6 +8,7 @@ from utils import setting_handler
 import plugins.ezid.logic as logic
 
 from plugins.ezid.models import RepoEZIDSettings
+from repository.models import Repository
 
 from datetime import datetime
 from django.utils import timezone
@@ -141,7 +142,7 @@ class EZIDPreprintTest(TestCase):
 
     def test_preprint_metadata(self):
         metadata = logic.get_preprint_metadata(self.preprint)
-        self.assertEqual(metadata["target_url"], f"http://localhost/testrepo/repository/view/{self.preprint.pk}/")
+        self.assertEqual(metadata["target_url"], self.preprint.url)
         self.assertEqual(metadata["title"], self.preprint.title)
         self.assertEqual(metadata["abstract"], self.preprint.abstract)
         self.assertFalse("published_doi" in metadata)
@@ -152,7 +153,7 @@ class EZIDPreprintTest(TestCase):
         self.preprint.title = "This is the title with a %"
         self.preprint.save()
         metadata = logic.get_preprint_metadata(self.preprint)
-        self.assertEqual(metadata["target_url"], f"http://localhost/testrepo/repository/view/{self.preprint.pk}/")
+        self.assertEqual(metadata["target_url"], self.preprint.url)
         self.assertEqual(metadata["title"], "This is the title with a %25")
         self.assertEqual(metadata["abstract"], self.preprint.abstract)
         self.assertFalse("published_doi" in metadata)
@@ -184,14 +185,28 @@ class EZIDPreprintTest(TestCase):
         self.assertFalse(success)
         self.assertEqual(msg, f"{self.preprint} already has a DOI: {self.preprint.preprint_doi}")
 
+    def test_disabled(self):
+        repo2 = Repository.objects.create(press=self.press,
+                                          name='Test Repository 2',
+                                          short_name='testrepo2',
+                                          object_name='Preprint',
+                                          object_name_plural='Preprints',
+                                          publisher='Test Publisher',
+                                          live=True,
+                                          domain="repo2.domain.com",)
+
+        preprint2 = helpers.create_preprint(repo2, self.user, self.subject)
+
+        enabled, success, msg = logic.mint_preprint_doi(preprint2)
+
+        self.assertFalse(enabled)
+
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_preprint_update(self, mock_send):
         self.preprint.preprint_doi = "10.9999/TEST"
         path = "id/doi:10.9999/TEST"
         payload = f'crossref: <?xml version="1.0"?><posted_content xmlns="http://www.crossref.org/schema/4.4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jats="http://www.ncbi.nlm.nih.gov/JATS1" xsi:schemaLocation="http://www.crossref.org/schema/4.4.0 http://www.crossref.org/schema/deposit/crossref4.4.0.xsd" type="preprint">  <group_title>Repo Subject</group_title>    <contributors>            <person_name contributor_role="author" sequence="first">          <given_name>User</given_name>          <surname>One</surname>                </person_name>        </contributors>    <titles>    <title>This is a Test Preprint</title>  </titles>  <posted_date>    <month>1</month>    <day>1</day>    <year>2023</year>  </posted_date>  <acceptance_date>    <month>1</month>    <day>1</day>    <year>2023</year>  </acceptance_date>    <jats:abstract>    <jats:p>This is a fake abstract.</jats:p>  </jats:abstract>        <!-- placeholder DOI, will be overwritten when DOI is minted -->  <doi_data>    <doi>10.50505/preprint_sample_doi_2</doi>    <resource>https://escholarship.org/</resource>  </doi_data>  </posted_content>\n_crossref: yes\n_profile: crossref\n_target: {self.preprint.url}\n_owner: owner'
-
-        print(self.preprint.pk)
 
         enabled, success, msg = logic.update_preprint_doi(self.preprint)
 
@@ -202,6 +217,7 @@ class EZIDPreprintTest(TestCase):
         self.assertTrue(enabled)
         self.assertTrue(success)
         self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
+        self.assertEqual(self.preprint.preprint_doi, "10.9999/TEST")
 
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
@@ -218,3 +234,4 @@ class EZIDPreprintTest(TestCase):
         self.assertTrue(enabled)
         self.assertTrue(success)
         self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
+        self.assertEqual(self.preprint.preprint_doi, "10.9999/TEST")

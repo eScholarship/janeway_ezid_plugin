@@ -139,7 +139,7 @@ def process_ezid_result(item, action, ezid_result):
         if ezid_result.startswith('success:'):
             doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
             logger.debug('DOI {} success: {}'.format(action, doi))
-            return True, True, ezid_result
+            return doi
         else:
             logger.error(f'EZID DOI {action} failed for {item}: {ezid_result}')
     else:
@@ -147,7 +147,7 @@ def process_ezid_result(item, action, ezid_result):
         if ezid_result != None:
             logger.error(ezid_result.msg)
 
-    return True, False, ezid_result
+    return None
 
 def get_preprint_metadata(preprint):
     ezid_metadata = {'now': timezone.now(),
@@ -167,24 +167,31 @@ def get_preprint_metadata(preprint):
     return ezid_metadata
 
 def preprint_doi(preprint, action):
-    ezid_metadata = get_preprint_metadata(preprint)
-    ezid_settings = RepoEZIDSettings.objects.get(repo=preprint.repository)
+    if RepoEZIDSettings.objects.filter(repo=preprint.repository).exists():
+        ezid_metadata = get_preprint_metadata(preprint)
+        ezid_settings = RepoEZIDSettings.objects.get(repo=preprint.repository)
 
-    shoulder = ezid_settings.ezid_shoulder
-    username = ezid_settings.ezid_username
-    password  = ezid_settings.ezid_password
-    endpoint_url = ezid_settings.ezid_endpoint_url
-    owner = ezid_settings.ezid_owner
+        shoulder = ezid_settings.ezid_shoulder
+        username = ezid_settings.ezid_username
+        password  = ezid_settings.ezid_password
+        endpoint_url = ezid_settings.ezid_endpoint_url
+        owner = ezid_settings.ezid_owner
 
-    payload = prepare_payload(ezid_metadata, 'ezid/posted_content.xml', ezid_metadata['target_url'], owner)
+        payload = prepare_payload(ezid_metadata, 'ezid/posted_content.xml', ezid_metadata['target_url'], owner)
 
-    if action == "update":
-        path = f'id/doi:{encode(preprint.preprint_doi)}'
+        if action == "update":
+            path = f'id/doi:{encode(preprint.preprint_doi)}'
+        else:
+            path = f'shoulder/{encode(shoulder)}'
+
+        ezid_result = send_request("POST", path, payload, username, password, endpoint_url)
+        doi = process_ezid_result(preprint, action, ezid_result)
+        if doi:
+            preprint.preprint_doi = doi
+            preprint.save()
+        return True, (doi != None), ezid_result
     else:
-        path = f'shoulder/{encode(shoulder)}'
-
-    ezid_result = send_request("POST", path, payload, username, password, endpoint_url)
-    return process_ezid_result(preprint, action, ezid_result)
+        return False, False, f"EZID not enabled for {preprint.repository}"
 
 def update_preprint_doi(preprint):
     if not preprint.preprint_doi:
@@ -249,7 +256,8 @@ def journal_article_doi(article, action):
         path = f'id/doi:{encode(ezid_metadata["doi"])}'
         payload = prepare_payload(ezid_metadata, template, ezid_metadata["target_url"], owner)
         ezid_result = send_request(method, path, payload, username, password, endpoint_url)
-        return process_ezid_result(article, action, ezid_result)
+        doi = process_ezid_result(article, action, ezid_result)
+        return True, (doi != None), ezid_result
     else:
         return False, False, f"EZID not enabled for {article.journal}"
 
