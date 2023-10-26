@@ -3,7 +3,7 @@ from django.core.management import call_command
 from django.template.loader import render_to_string
 
 from utils.testing import helpers
-from utils import setting_handler
+from utils import setting_handler, logger
 
 import plugins.ezid.logic as logic
 
@@ -159,6 +159,31 @@ class EZIDPreprintTest(TestCase):
         self.assertFalse("published_doi" in metadata)
         self.assertEqual(metadata["group_title"], self.subject.name)
         self.assertEqual(len(metadata["contributors"]), 1)
+
+    def test_published_doi(self):
+        self.preprint.doi = "https://doi.org/10.15697/TEST"
+        self.preprint.save()
+
+        metadata = logic.get_preprint_metadata(self.preprint)
+        self.assertEqual(metadata["target_url"], self.preprint.url)
+        self.assertEqual(metadata["title"], self.preprint.title)
+        self.assertEqual(metadata["abstract"], self.preprint.abstract)
+        self.assertEqual(metadata["published_doi"], self.preprint.doi)
+        self.assertEqual(metadata["group_title"], self.subject.name)
+        self.assertEqual(len(metadata["contributors"]), 1)
+
+    @mock.patch.object(logger.PrefixedLoggerAdapter, 'error')
+    def test_bad_published_doi(self, error_mock):
+        self.preprint.doi = "10.15697/TEST"
+        self.preprint.save()
+        metadata = logic.get_preprint_metadata(self.preprint)
+        self.assertEqual(metadata["target_url"], self.preprint.url)
+        self.assertEqual(metadata["title"], self.preprint.title)
+        self.assertEqual(metadata["abstract"], self.preprint.abstract)
+        self.assertFalse("published_doi" in metadata)
+        self.assertEqual(metadata["group_title"], self.subject.name)
+        self.assertEqual(len(metadata["contributors"]), 1)
+        error_mock.assert_called_once_with(f'{self.preprint} has an invalid Published DOI: {self.preprint.doi}')
 
     def test_preprint_template(self):
         metadata = logic.get_preprint_metadata(self.preprint)
