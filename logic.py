@@ -18,12 +18,12 @@ from django.template.loader import render_to_string
 from utils.logger import get_logger
 from utils import setting_handler
 
+from django.contrib import messages
+
+
 from plugins.ezid.models import RepoEZIDSettings
 
 logger = get_logger(__name__)
-
-# disable to too many branches warning for PyLint
-# pylint: disable=R0912
 
 def get_valid_orcid(orcid):
     ''' Determine whether the given input_string is a valid ORCID '''
@@ -163,7 +163,7 @@ def get_preprint_metadata(preprint):
         if is_valid_url(preprint.doi):
             ezid_metadata['published_doi'] = preprint.doi
         else:
-            logger.error(f'invalid URL, DOI: {preprint.doi} for {preprint}')
+            logger.error(f'{preprint} has an invalid Published DOI: {preprint.doi}')
 
     return ezid_metadata
 
@@ -214,7 +214,12 @@ def preprint_publication(**kwargs):
     ''' hook script for the preprint_publication event '''
     logger.debug('>>> preprint_publication called, mint an EZID DOI...')
     preprint = kwargs.get('preprint')
-    return mint_preprint_doi(preprint)
+    request = kwargs.get('request')
+    enabled, success, msg = mint_preprint_doi(preprint)
+    if success:
+        messages.success(request, f"Successfully minted DOI {preprint.preprint_doi} for {preprint}")
+    else:
+        messages.info(request, msg)
 
 def get_setting(name, journal):
     return setting_handler.get_setting('plugin:ezid', name, journal).processed_value
@@ -233,14 +238,18 @@ def get_journal_metadata(article):
 def get_journal_template(journal):
     return 'ezid/book_chapter.xml' if get_setting('ezid_book_chapter', journal) else 'ezid/journal_content.xml'
 
-def journal_article_doi(article, action):
+def journal_article_doi(article, action, request):
     if get_setting('ezid_plugin_enable', article.journal):
         if not is_valid_issn(article.journal.issn) and not is_valid_url(article.journal.issn):
-            return True, False, f"Invalid ISSN {article.journal.issn} for {article.journal}"
+            msg = f"Invalid ISSN {article.journal.issn} for {article.journal}"
+            if request: messages.error(msg)
+            return True, False, msg
 
         ezid_metadata = get_journal_metadata(article)
         if not ezid_metadata["doi"] and action != "mint":
-            return True, False, f"{article} not assigned a DOI"
+            msg = f"{article} not assigned a DOI"
+            if request: messages.error(msg)
+            return True, False, msg
         template = get_journal_template(article.journal)
 
         if action == "update":
@@ -255,18 +264,27 @@ def journal_article_doi(article, action):
         owner = setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value
 
         if not username or not password or not endpoint_url or not owner:
-            return True, False, f"EZID not fully configured for {article.journal}"
+            msg = f"EZID not fully configured for {article.journal}"
+            if request: messages.error(msg)
+            return True, False, msg
 
         path = f'id/doi:{encode(ezid_metadata["doi"])}'
         payload = prepare_payload(ezid_metadata, template, ezid_metadata["target_url"], owner)
         ezid_result = send_request(method, path, payload, username, password, endpoint_url)
         doi = process_ezid_result(article, action, ezid_result)
+        if doi:
+            msg = f"Success: {action} DOI {doi} for {article}"
+            if request: messages.success(msg)
+            logger.debug(msg)
+
         return True, (doi != None), ezid_result
     else:
-        return False, False, f"EZID not enabled for {article.journal}"
+        msg = f"EZID not enabled for {article.journal}"
+        if request: messages.warning(msg)
+        return False, False, msg
 
-def update_journal_doi(article):
-    return journal_article_doi(article, "update")
+def update_journal_doi(article, request=None):
+    return journal_article_doi(article, "update", request)
 
-def register_journal_doi(article):
-    return journal_article_doi(article, "register")
+def register_journal_doi(article, request=None):
+    return journal_article_doi(article, "register", request)
