@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.template.loader import render_to_string
 from utils.logger import get_logger
 from utils import setting_handler
+from identifiers import logic as id_logic
 
 from django.contrib import messages
 
@@ -288,3 +289,10 @@ def update_journal_doi(article, request=None):
 
 def register_journal_doi(article, request=None):
     return journal_article_doi(article, "register", request)
+
+def assign_article_doi(**kwargs):
+    print(kwargs)
+    article = kwargs.get('article')
+    print(article)
+    id = id_logic.generate_crossref_doi_with_pattern(article)
+    print(id)
