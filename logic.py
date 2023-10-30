@@ -291,8 +291,6 @@ def register_journal_doi(article, request=None):
     return journal_article_doi(article, "register", request)
 
 def assign_article_doi(**kwargs):
-    print(kwargs)
     article = kwargs.get('article')
-    print(article)
-    id = id_logic.generate_crossref_doi_with_pattern(article)
-    print(id)
+    if not article.get_doi():
+        id = id_logic.generate_crossref_doi_with_pattern(article)
