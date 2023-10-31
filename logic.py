@@ -135,14 +135,18 @@ def prepare_payload(ezid_metadata, template, target_url, owner):
     payload = f"crossref: {metadata}\n_crossref: yes\n_profile: crossref\n_target: {target_url}\n_owner: {owner}"
     return payload
 
-def process_ezid_result(item, action, ezid_result):
+def process_ezid_result(item, action, ezid_result, request):
     if isinstance(ezid_result, str):
         if ezid_result.startswith('success:'):
             doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
-            logger.debug('DOI {} success: {}'.format(action, doi))
+            msg = f'DOI {action} success: {doi}'
+            logger.debug(msg)
+            if request: messages.success(request, msg)
             return doi
         else:
-            logger.error(f'EZID DOI {action} failed for {item}: {ezid_result}')
+            msg = f'EZID DOI {action} failed for {item}: {ezid_result}'
+            logger.error(msg)
+            if request: messages.error(request, msg)
     else:
         logger.error(f'EZID DOI {action} failed for {item}')
         if ezid_result != None:
@@ -168,7 +172,7 @@ def get_preprint_metadata(preprint):
 
     return ezid_metadata
 
-def preprint_doi(preprint, action):
+def preprint_doi(preprint, action, request):
     if RepoEZIDSettings.objects.filter(repo=preprint.repository).exists():
         ezid_metadata = get_preprint_metadata(preprint)
         ezid_settings = RepoEZIDSettings.objects.get(repo=preprint.repository)
@@ -187,7 +191,7 @@ def preprint_doi(preprint, action):
             path = f'shoulder/{encode(shoulder)}'
 
         ezid_result = send_request("POST", path, payload, username, password, endpoint_url)
-        doi = process_ezid_result(preprint, action, ezid_result)
+        doi = process_ezid_result(preprint, action, ezid_result, request)
         if doi:
             preprint.preprint_doi = doi
             preprint.save()
@@ -195,32 +199,28 @@ def preprint_doi(preprint, action):
     else:
         return False, False, f"EZID not enabled for {preprint.repository}"
 
-def update_preprint_doi(preprint):
+def update_preprint_doi(preprint, request=None):
     if not preprint.preprint_doi:
         msg = f'{preprint} does not have a DOI'
         logger.info(msg)
         return True, False, msg
     else:
-        return preprint_doi(preprint, "update")
+        return preprint_doi(preprint, "update", request)
 
-def mint_preprint_doi(preprint):
+def mint_preprint_doi(preprint, request=None):
     if preprint.preprint_doi:
         msg = f'{preprint} already has a DOI: {preprint.preprint_doi}'
         logger.info(msg)
         return True, False, msg
     else:
-        return preprint_doi(preprint, "mint")
+        return preprint_doi(preprint, "mint", request)
 
 def preprint_publication(**kwargs):
     ''' hook script for the preprint_publication event '''
     logger.debug('>>> preprint_publication called, mint an EZID DOI...')
     preprint = kwargs.get('preprint')
     request = kwargs.get('request')
-    enabled, success, msg = mint_preprint_doi(preprint)
-    if success:
-        messages.success(request, f"Successfully minted DOI {preprint.preprint_doi} for {preprint}")
-    else:
-        messages.info(request, msg)
+    enabled, success, msg = mint_preprint_doi(preprint, request=request)
 
 def get_setting(name, journal):
     return setting_handler.get_setting('plugin:ezid', name, journal).processed_value
@@ -272,12 +272,7 @@ def journal_article_doi(article, action, request):
         path = f'id/doi:{encode(ezid_metadata["doi"])}'
         payload = prepare_payload(ezid_metadata, template, ezid_metadata["target_url"], owner)
         ezid_result = send_request(method, path, payload, username, password, endpoint_url)
-        doi = process_ezid_result(article, action, ezid_result)
-        if doi:
-            msg = f"Success: {action} DOI {doi} for {article}"
-            if request: messages.success(msg)
-            logger.debug(msg)
-
+        doi = process_ezid_result(article, action, ezid_result, request)
         return True, (doi != None), ezid_result
     else:
         msg = f"EZID not enabled for {article.journal}"
