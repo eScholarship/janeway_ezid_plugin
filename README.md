@@ -57,12 +57,15 @@ To override EZID settings for a particular journal:
 
 When installed and configured, the plugin will mint DOIs and add them to the system-created `preprint_doi` field for each newly-accepted preprint. Errors are logged.
 
+* `register_ezid_doi` *`short_name`* *`preprint_id`* - Mint a new DOI for the given article.  Preprint.preprint_doi should not be set.
+* `update_ezid_doi` *`short_name`* *`preprint_id`* - Send and update request for the DOI in Preprint.preprint_doi.
+
 ### Journals
 
 When an article is pushed to eScholarship with the janeway to escholarship plugin if the ezid plugin is installed and configured a doi is registered. DOIs are generated based on the Article DOI Pattern setting which is in line with Janeway functionality with Crossref.  There are also management commands that allow you to manually register or update a DOI associated with an article.
 
-* `register_journal_ezid_doi <article_id>`
-* `update_journal_ezid_doi <article_id>`
+* `register_journal_ezid_doi` *`article_id`* - Article should already have an Identifier of type "DOI" assigned to it.  Register it.
+* `update_journal_ezid_doi` *`article_id`* - Send an update request for an already registered DOI.  The caller is expected to track the status of the DOI.
 
 ## Contributing
 

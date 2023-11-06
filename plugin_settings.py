@@ -64,7 +64,9 @@ def register_for_events():
 
 def hook_registry():
     ''' connect a hook with a method in this plugin's logic '''
-    logger.debug('>>>>>>>>>>>>>>>>> hook_registry called for ezid plugin')
+    logger.debug('hook_registry called for ezid plugin')
     event_logic.Events.register_for_event(event_logic.Events.ON_PREPRINT_PUBLICATION,
                                           logic.preprint_publication)
+    event_logic.Events.register_for_event(event_logic.Events.ON_ARTICLE_ACCEPTED,
+                                          logic.assign_article_doi)
 

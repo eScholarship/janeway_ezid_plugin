@@ -3,79 +3,96 @@ This module contains the logic for the EZID plugin for Janeway
 """
 
 __copyright__ = "Copyright (c) 2020, The Regents of the University of California"
-__author__ = "Hardy Pottinger & Mahjabeen Yucekul"
+__author__ = "Hardy Pottinger, Mahjabeen Yucekul & Esther Verreau"
 __license__ = "BSD 3-Clause"
 __maintainer__ = "California Digital Library"
 
 import re
 from urllib.parse import quote
 import urllib.request as urlreq
-import json
-# import pdb # use for debugging
+
 from django.core.validators import URLValidator, ValidationError
 from django.conf import settings
 from django.utils import timezone
 from django.template.loader import render_to_string
 from utils.logger import get_logger
 from utils import setting_handler
+from identifiers import logic as id_logic
 
-from .models import RepoEZIDSettings
+from django.contrib import messages
+
+
+from plugins.ezid.models import RepoEZIDSettings
 
 logger = get_logger(__name__)
 
-# disable to too many branches warning for PyLint
-# pylint: disable=R0912
-
-def orcid_validation_check(input_string):
+def get_valid_orcid(orcid):
     ''' Determine whether the given input_string is a valid ORCID '''
+    if not orcid:
+        return None
+    if not orcid.startswith('http'):
+        orcid = f'https://orcid.org/{orcid}'
+
     regex = re.compile('https?://orcid.org/[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[X0-9]{1}$')
-    match = regex.match(str(input_string))
-    return bool(match)
+    match = regex.match(str(orcid))
+    return orcid if bool(match) else None
 
 def normalize_author_metadata(preprint_authors):
-
     ''' returns a list of authors in dictionary format using a list of author objects '''
     #example: {"given_name": "Hardy", "surname": "Pottinger", "ORCID": "https://orcid.org/0000-0001-8549-9354"},
     author_list = []
     for author in preprint_authors:
-
-        # build our new_author dictionary
         new_author = dict()
-
         contributor = author.account
-
         if contributor is None:
-            logger.warn('A Preprintauthor.account object is None, this should not be possible... skipping null author.')
+            logger.warn('No preprint author account found')
+        elif not contributor.first_name and not contributor.last_name:
+            logger.warn('No names given for preprint author')
         else:
-            if contributor.first_name:
-                new_author['given_name'] = contributor.first_name
-            else:
-                logger.info('EZID: missing author first name encountered, omitting given_name from EZID minting request...')
-
             if contributor.last_name:
+                new_author['given_name'] = contributor.first_name
                 new_author['surname'] = contributor.last_name
             else:
-                logger.info('EZID: missing author last name encountered, attempting to use first name as surname in EZID minting request, since surname is mandatory...')
-                if contributor.first_name:
-                    new_author['surname'] = contributor.first_name
-                    del new_author['given_name']
-                else:
-                    logger.warning('EZID: no usable name found for author...')
+                new_author['surname'] = contributor.first_name
+                logger.info(f'No last_name found for {contributor} using first_name')
 
-            if contributor.orcid:
-                if contributor.orcid.startswith('http'):
-                    usable_orcid = contributor.orcid
-                else:
-                    usable_orcid = 'https://orcid.org/' + contributor.orcid
-
-                if orcid_validation_check(usable_orcid):
-                    new_author['ORCID'] = usable_orcid
-                else:
-                    logger.warning('EZID: unsuable ORCID value of "' + usable_orcid + '" encountered, omitting from EZID minting request...')
+            orcid = get_valid_orcid(contributor.orcid)
+            if orcid:
+                new_author['ORCID'] = orcid
+            else:
+                logger.warning(f'Invalid ORCID {contributor.orcid} for {contributor} omitted')
 
             author_list.append(new_author)
-
     return author_list
+
+def escape_str(s):
+    # To prevent percent-decode error from EZID
+    return s.replace('%','%25') if s else s
+
+def encode(txt):
+    ''' encode a text string '''
+    return quote(txt, ":/")
+
+def get_date_dict(d):
+    if d:
+        return {'month': d.month, 'day': d.day, 'year': d.year}
+    return None
+
+def is_valid_issn(issn):
+    if not issn or issn == "0000-0000":
+        return False
+
+    r = re.compile("^[0-9]{4}-[0-9]{3}[0-9X]$")
+
+    return re.search(r, issn)
+
+def is_valid_url(url):
+    try:
+        validator = URLValidator()
+        validator(url)
+        return True
+    except ValidationError:
+        return False
 
 class EzidHTTPErrorProcessor(urlreq.HTTPErrorProcessor):
     ''' Error Processor, required to let 201 responses pass '''
@@ -87,10 +104,8 @@ class EzidHTTPErrorProcessor(urlreq.HTTPErrorProcessor):
         return my_return
     https_response = http_response
 
-def send_create_request(data, id, username, password, endpoint_url):
-    ''' sends a create request to EZID '''
-    method = "PUT"
-    path = 'id/doi:{}'.format(encode(id))
+def send_request(method, path, data, username, password, endpoint_url):
+    ''' sends a request to EZID '''
     request_url = f"{endpoint_url}/{path}"
 
     opener = urlreq.build_opener(EzidHTTPErrorProcessor())
@@ -109,333 +124,168 @@ def send_create_request(data, id, username, password, endpoint_url):
         return response.decode("UTF-8")
 
     except urlreq.HTTPError as ezid_error:
-        #print("%d %s\n" % (ezid_error.code, ezid_error.msg))
         if ezid_error.fp is not None:
             response = ezid_error.fp.read().decode("utf-8")
             if not response.endswith("\n"):
                 response += "\n"
-            #print(response)
         return response
 
-def send_mint_request(data, shoulder, username, password, endpoint_url):
-    ''' sends a mint request to EZID '''
-    method = "POST"
-    path = 'shoulder/' + encode(shoulder)
+def prepare_payload(ezid_metadata, template, target_url, owner):
+    metadata = render_to_string(template, ezid_metadata).replace('\n', '').replace('\r', '')
+    payload = f"crossref: {metadata}\n_crossref: yes\n_profile: crossref\n_target: {target_url}\n_owner: {owner}"
+    return payload
 
-    opener = urlreq.build_opener(EzidHTTPErrorProcessor())
-    ezid_handler = urlreq.HTTPBasicAuthHandler()
-    ezid_handler.add_password("EZID", endpoint_url, username, password)
-    opener.add_handler(ezid_handler)
+def process_ezid_result(item, action, ezid_result, request):
+    if isinstance(ezid_result, str):
+        if ezid_result.startswith('success:'):
+            doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
+            msg = f'DOI {action} success: {doi}'
+            logger.debug(msg)
+            if request: messages.success(request, msg)
+            return doi
+        else:
+            msg = f'EZID DOI {action} failed for {item}: {ezid_result}'
+            logger.error(msg)
+            if request: messages.error(request, msg)
+    else:
+        logger.error(f'EZID DOI {action} failed for {item}')
+        if ezid_result != None:
+            logger.error(ezid_result.msg)
 
+    return None
 
-    request = urlreq.Request("%s/%s" % (endpoint_url, path))
-    request.get_method = lambda: method
-    request.add_header("Content-Type", "text/plain; charset=UTF-8")
-    request.data = data.encode("UTF-8")
+def get_preprint_metadata(preprint):
+    ezid_metadata = {'now': timezone.now(),
+                     'target_url': preprint.url,
+                     'group_title': preprint.subject.values_list()[0][2],
+                     'contributors': normalize_author_metadata(preprint.preprintauthor_set.all()),
+                     'title': escape_str(preprint.title),
+                     'published_date': get_date_dict(preprint.date_published),
+                     'accepted_date': get_date_dict(preprint.date_accepted),
+                     'abstract': escape_str(preprint.abstract)}
 
-    try:
-        connection = opener.open(request)
-        response = connection.read()
-        return response.decode("UTF-8")
+    if preprint.doi:
+        if is_valid_url(preprint.doi):
+            ezid_metadata['published_doi'] = preprint.doi
+        else:
+            logger.error(f'{preprint} has an invalid Published DOI: {preprint.doi}')
 
-    except urlreq.HTTPError as ezid_error:
-        print("%d %s\n" % (ezid_error.code, ezid_error.msg))
-        if ezid_error.fp is not None:
-            response = ezid_error.fp.read()
-           # FIXME: this code throws errors, endswith doesn't work with response
-           # if not response.endswith("\n"):
-           #     response += "\n"
-            print(response)
+    return ezid_metadata
 
-def send_update_request(data, update_id, username, password, endpoint_url):
-    ''' sends an update request to EZID '''
-    method = "POST"
-    path = 'id/doi:' + encode(update_id)
+def preprint_doi(preprint, action, request):
+    if RepoEZIDSettings.objects.filter(repo=preprint.repository).exists():
+        ezid_metadata = get_preprint_metadata(preprint)
+        ezid_settings = RepoEZIDSettings.objects.get(repo=preprint.repository)
 
-    # print('path: ' + path)
+        shoulder = ezid_settings.ezid_shoulder
+        username = ezid_settings.ezid_username
+        password  = ezid_settings.ezid_password
+        endpoint_url = ezid_settings.ezid_endpoint_url
+        owner = ezid_settings.ezid_owner
 
-    opener = urlreq.build_opener(EzidHTTPErrorProcessor())
-    ezid_handler = urlreq.HTTPBasicAuthHandler()
-    ezid_handler.add_password("EZID", endpoint_url, username, password)
-    opener.add_handler(ezid_handler)
+        payload = prepare_payload(ezid_metadata, 'ezid/posted_content.xml', ezid_metadata['target_url'], owner)
 
-    request = urlreq.Request("%s/%s" % (endpoint_url, path))
-    request.get_method = lambda: method
-    request.add_header("Content-Type", "text/plain; charset=UTF-8")
-    request.data = data.encode("UTF-8")
+        if action == "update":
+            path = f'id/doi:{encode(preprint.preprint_doi)}'
+        else:
+            path = f'shoulder/{encode(shoulder)}'
 
-    try:
-        connection = opener.open(request)
-        response = connection.read()
-        return response.decode("UTF-8")
+        ezid_result = send_request("POST", path, payload, username, password, endpoint_url)
+        doi = process_ezid_result(preprint, action, ezid_result, request)
+        if doi:
+            preprint.preprint_doi = doi
+            preprint.save()
+        return True, (doi != None), ezid_result
+    else:
+        return False, False, f"EZID not enabled for {preprint.repository}"
 
-    except urlreq.HTTPError as ezid_error:
-        print("%d %s\n" % (ezid_error.code, ezid_error.msg))
-        if ezid_error.fp is not None:
-            response = ezid_error.fp.read().decode("utf-8")
-            if not response.endswith("\n"):
-                response += "\n"
-            print(response)
+def update_preprint_doi(preprint, request=None):
+    if not preprint.preprint_doi:
+        msg = f'{preprint} does not have a DOI'
+        logger.info(msg)
+        return True, False, msg
+    else:
+        return preprint_doi(preprint, "update", request)
 
-def encode(txt):
-    ''' encode a text string '''
-    return quote(txt, ":/")
-
-def mint_doi_via_ezid(ezid_config, ezid_metadata, template):
-    ''' Sends a mint request for the specified config, using the provided data '''
-    # ezid_config dictionary contains values for the following keys: shoulder, username, password, endpoint_url
-    # ezid_data dicitionary contains values for the following keys: target_url, group_title, contributors, title, published_date, accepted_date
-
-    # add a timestamp to our metadata, we'll need it
-    ezid_metadata['now'] = timezone.now()
-
-    if ezid_metadata.get('published_doi') is not None:
-        #we cannot trust that the published_doi has been validated, or is usable as a URL, so let's do that now
-        logger.debug('validating published_doi')
-        validator = URLValidator()
-        try:
-            validator(ezid_metadata.get('published_doi'))
-        except ValidationError:
-            logger.error('invalid URL, published_doi: %s for preprint: %s', ezid_metadata.get('published_doi'), ezid_metadata.get('target_url'))
-            del ezid_metadata['published_doi'] # this is not a permanent deletion
-
-    template_context = ezid_metadata
-    crossref_template = render_to_string(template, template_context)
-
-    logger.debug(crossref_template)
-
-    metadata = crossref_template.replace('\n', '').replace('\r', '')
-
-    # uncomment this to validate the metadata payload
-    # print('\n\n')
-    # print('Using this metadata:')
-    # print('\n\n')
-    # print(metadata)
-
-    # build the payload
-    payload = 'crossref: ' + metadata + '\n_crossref: yes\n_profile: crossref\n_target: ' + ezid_metadata['target_url'] + '\n_owner: ' + ezid_config['owner']
-
-    # print('\n\npayload:\n\n')
-    # print(payload)
-
-    return send_mint_request(payload, ezid_config['shoulder'], ezid_config['username'], ezid_config['password'], ezid_config['endpoint_url'])
-
-def update_doi_via_ezid(ezid_config, ezid_metadata, template):
-    ''' Sends an update request for the specified config, using the provided data '''
-    # ezid_config dictionary contains values for the following keys: shoulder, username, password, endpoint_url
-    # ezid_metadata dicitionary contains values for the following keys: update_id, target_url, group_title, contributors, title, published_date, accepted_date
-
-    # add a timestamp to our metadata, we'll need it
-    ezid_metadata['now'] = timezone.now()
-
-    if ezid_metadata.get('published_doi') is not None:
-        #we cannot trust that the published_doi has been validated, or is usable as a URL, so let's do that now
-        logger.debug('validating published_doi')
-        validator = URLValidator()
-        try:
-            validator(ezid_metadata.get('published_doi'))
-        except ValidationError:
-            logger.error('invalid URL, published_doi: %s for preprint: %s', ezid_metadata.get('published_doi'), ezid_metadata.get('target_url'))
-            del ezid_metadata['published_doi'] # this is not a permanent deletion
-
-    template_context = ezid_metadata
-    crossref_template = render_to_string(template, template_context)
-
-    logger.debug(crossref_template)
-
-    metadata = crossref_template.replace('\n', '').replace('\r', '')
-
-    # uncomment this to validate the metadata payload
-    # print('\n\n')
-    # print('Using this metadata:')
-    # print('\n\n')
-    # print(metadata)
-
-    # build the payload
-    payload = 'crossref: ' + metadata + '\n_crossref: yes\n_profile: crossref\n_target: ' + ezid_metadata['target_url'] + '\n_owner: ' + ezid_config['owner']
-
-    # print('\n\npayload:\n\n')
-    # print(payload)
-
-    return send_update_request(payload, ezid_metadata['update_id'], ezid_config['username'], ezid_config['password'], ezid_config['endpoint_url'])
-
-def create_doi_via_ezid(ezid_config, ezid_metadata, template):
-    ''' Sends a create request for the specified config, using the provided data '''
-
-    ezid_metadata['now'] = timezone.now()
-
-    template_context = ezid_metadata
-    crossref_template = render_to_string(template, template_context)
-
-    logger.debug(crossref_template)
-
-    metadata = crossref_template.replace('\n', '').replace('\r', '')
-
-    # uncomment this to validate the metadata payload
-    # print('\n\n')
-    # print('Using this metadata:')
-    # print('\n\n')
-    # print(metadata)
-
-    # build the payload
-    payload = 'crossref: ' + metadata + '\n_crossref: yes\n_profile: crossref\n_target: ' + ezid_metadata['target_url'] + '\n_owner: ' + ezid_config['owner']
-
-    # print('\n\npayload:\n\n')
-    # print(payload)
-
-    return send_create_request(payload, ezid_metadata['doi'], ezid_config['username'], ezid_config['password'], ezid_config['endpoint_url'])
+def mint_preprint_doi(preprint, request=None):
+    if preprint.preprint_doi:
+        msg = f'{preprint} already has a DOI: {preprint.preprint_doi}'
+        logger.info(msg)
+        return True, False, msg
+    else:
+        return preprint_doi(preprint, "mint", request)
 
 def preprint_publication(**kwargs):
     ''' hook script for the preprint_publication event '''
     logger.debug('>>> preprint_publication called, mint an EZID DOI...')
-
     preprint = kwargs.get('preprint')
     request = kwargs.get('request')
-
-    # check to see if this preprint already has a DOI, if so, our job is done, do not try to make a new one
-    if preprint.preprint_doi:
-        logger.debug('preprint already has a DOI:')
-        logger.debug(preprint.preprint_doi)
-        logger.debug('No need to mint a new DOI, skipping.')
-        return None
-
-    # gather metadata required for minting a DOI via EZID
-    target_url = preprint.url
-
-    group_title = preprint.subject.values_list()[0][2]
-    title = preprint.title.replace('%', '%25')
-    published_doi = preprint.doi
-    abstract = preprint.abstract.replace('%', '%25')
-    accepted_date = {'month':preprint.date_accepted.month, 'day':preprint.date_accepted.day, 'year':preprint.date_accepted.year}
-    published_date = {'month':preprint.date_published.month, 'day':preprint.date_published.day, 'year':preprint.date_published.year}
-
-
-    contributors = normalize_author_metadata(preprint.preprintauthor_set.all())
-
-    #some notes on the metatdata required:
-    # [x] target_url (direct link to preprint)
-    # [x] group_title ( preprint.subject.values_list()[0][2] ) grab the first subject
-    # [x] contributors - needs to be a list, with a dictionary per row:
-    # "person_name": [{"@sequence": "first", "@contributor_role": "author", "given_name": "Hardy", "surname": "Pottinger", "ORCID": "https://orcid.org/0000-0001-8549-9354"},]
-    # (preprint.preprintauthor_set is an object ref, work with it, preprintauthor_set.all() would get you a list of all authors)
-    # [x] title (preprint.title)
-    # [x] posted_date (preprint.date_published, is a datetime object)
-    # [x] acceptance_date (preprint.date_accepted, is a datetime object)
-
-    logger.debug("preprint url: " + target_url)
-    logger.debug("title: " + title)
-    logger.debug("group_title: " + group_title)
-    logger.debug("contributors: " + json.dumps(contributors))
-    logger.debug("accepted_date: " + json.dumps(accepted_date))
-    logger.debug("published_date: " + json.dumps(published_date))
-
-    logger.debug('BEGIN MINTING REQUEST...')
-
-    # prepare two dictionaries to feed into the mint_doi_via_ezid function
-
-    ezid_settings = RepoEZIDSettings.objects.get(repo=preprint.repository)
-    ezid_config = {'shoulder': ezid_settings.ezid_shoulder,
-                   'username': ezid_settings.ezid_username,
-                   'password': ezid_settings.ezid_password,
-                   'endpoint_url': ezid_settings.ezid_endpoint_url,
-                   'owner': ezid_settings.ezid_owner}
-    ezid_metadata = {'target_url': target_url, 'group_title': group_title, 'contributors': contributors, 'title': title, 'published_date': published_date, 'accepted_date': accepted_date, 'published_doi': published_doi, 'abstract': abstract}
-
-    logger.debug('ezid_config: ' + json.dumps(ezid_config))
-    logger.debug('ezid_metadata: '+ json.dumps(ezid_metadata))
-
-    ezid_result = mint_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/posted_content.xml')
-
-    # if the ezid_result is a string, it's probably a success, check to be sure
-    if isinstance(ezid_result, str):
-        if ezid_result.startswith('success:'):
-            new_doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
-            logger.debug('DOI successfully created: ' + new_doi)
-            preprint.preprint_doi = new_doi
-            preprint.save()
-            logger.debug('DOI added to preprint Janeway object and saved. A preprint is born!')
-        else:
-            logger.error('EZID DOI creation failed for preprint.pk: ' + preprint.pk + ' ...')
-            logger.error('ezid_result: ' + ezid_result)
-    else:
-        logger.error('EZID DOI creation failed for preprint.pk: ' + preprint.pk + ' ...')
-        logger.error(ezid_result.msg)
-
-# TODO: PUBD-118 fire a metadata update when a new preprint version is created
-# def preprint_version_update(**kwargs):
-#     ''' hook script for the preprint_version_update event '''
-#     logger.debug('>>> preprint_version_update called, update DOI metadata via EZID...')
-
-#     preprint = kwargs.get('preprint')
-#     request = kwargs.get('request')
-
-#     logger.debug("preprint.id = " + preprint.id)
-#     logger.debug("request: " + request)
+    enabled, success, msg = mint_preprint_doi(preprint, request=request)
 
 def get_setting(name, journal):
     return setting_handler.get_setting('plugin:ezid', name, journal).processed_value
 
 def get_journal_metadata(article):
-    target_url = article.remote_url
+    return {'now': timezone.now(),
+            'target_url': article.remote_url,
+            'article': article,
+            'title': escape_str(article.title),
+            'abstract': escape_str(article.abstract),
+            'doi': article.get_doi(),
+            'depositor_name': setting_handler.get_setting('Identifiers', 'crossref_name', article.journal).processed_value,
+            'depositor_email': setting_handler.get_setting('Identifiers', 'crossref_email', article.journal).processed_value,
+            'registrant': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,}
 
-    ezid_config = { 'username': get_setting('ezid_plugin_username', article.journal),
-                    'password': get_setting('ezid_plugin_password', article.journal),
-                    'endpoint_url': get_setting('ezid_plugin_endpoint_url', article.journal),
-                    'owner': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,}
-    ezid_metadata = {'target_url': target_url,
-                     'article': article,
-                     'doi': article.get_doi(),
-                     'depositor_name': setting_handler.get_setting('Identifiers', 'crossref_name', article.journal).processed_value,
-                     'depositor_email': setting_handler.get_setting('Identifiers', 'crossref_email', article.journal).processed_value,
-                     'registrant': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,}
-    return ezid_config, ezid_metadata
+def get_journal_template(journal):
+    return 'ezid/book_chapter.xml' if get_setting('ezid_book_chapter', journal) else 'ezid/journal_content.xml'
 
-def process_ezid_result(article, action, ezid_result):
-    if isinstance(ezid_result, str):
-        if ezid_result.startswith('success:'):
-            doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
-            logger.debug('DOI {} success: {}'.format(action, doi))
-            return True, True, ezid_result
-        else:
-            logger.error('EZID DOI {} failed for article.pk: {}...'.format(action, article.pk))
-            logger.error('ezid_result: ' + ezid_result)
-    else:
-        logger.error('EZID DOI {} failed for article.pk: {}...'.format(action, article.pk))
-        if ezid_result != None:
-            logger.error(ezid_result.msg)
-
-    return True, False, ezid_result
-
-def update_journal_doi(article):
+def journal_article_doi(article, action, request):
     if get_setting('ezid_plugin_enable', article.journal):
-        # To prevent percent-decode error from EZID
-        article.title = article.title.replace('%','%25')
-        article.abstract = article.abstract.replace('%','%25')
-        ezid_config, ezid_metadata = get_journal_metadata(article)
+        if not is_valid_issn(article.journal.issn) and not is_valid_url(article.journal.issn):
+            msg = f"Invalid ISSN {article.journal.issn} for {article.journal}"
+            if request: messages.error(msg)
+            return True, False, msg
 
-        ezid_metadata['update_id'] = article.get_doi()
+        ezid_metadata = get_journal_metadata(article)
+        if not ezid_metadata["doi"] and action != "mint":
+            msg = f"{article} not assigned a DOI"
+            if request: messages.error(msg)
+            return True, False, msg
+        template = get_journal_template(article.journal)
 
-        if get_setting('ezid_book_chapter', article.journal):
-            #print("Using BOOK CHAPTER")
-            ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/book_chapter.xml')
+        if action == "update":
+            ezid_metadata['update_id'] = ezid_metadata["doi"]
+            method = "POST"
         else:
-            ezid_result = update_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
+            method = "PUT"
 
-        return process_ezid_result(article, "update", ezid_result)
-    else:
-        return False, False, ""
+        username = get_setting('ezid_plugin_username', article.journal)
+        password = get_setting('ezid_plugin_password', article.journal)
+        endpoint_url = get_setting('ezid_plugin_endpoint_url', article.journal)
+        owner = setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value
 
-def register_journal_doi(article):
-    if get_setting('ezid_plugin_enable', article.journal):
-        # To prevent percent-decode error from EZID
-        article.title = article.title.replace('%','%25')
-        article.abstract = article.abstract.replace('%','%25')
-        ezid_config, ezid_metadata = get_journal_metadata(article)
-        if get_setting('ezid_book_chapter', article.journal):
-            #print("Using BOOK CHAPTER")
-            ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/book_chapter.xml')
-        else:
-            ezid_result = create_doi_via_ezid(ezid_config, ezid_metadata, 'ezid/journal_content.xml')
-        return process_ezid_result(article, "creation", ezid_result)
+        if not username or not password or not endpoint_url or not owner:
+            msg = f"EZID not fully configured for {article.journal}"
+            if request: messages.error(msg)
+            return True, False, msg
+
+        path = f'id/doi:{encode(ezid_metadata["doi"])}'
+        payload = prepare_payload(ezid_metadata, template, ezid_metadata["target_url"], owner)
+        ezid_result = send_request(method, path, payload, username, password, endpoint_url)
+        doi = process_ezid_result(article, action, ezid_result, request)
+        return True, (doi != None), ezid_result
     else:
-        return False, False, ""
+        msg = f"EZID not enabled for {article.journal}"
+        if request: messages.warning(msg)
+        return False, False, msg
+
+def update_journal_doi(article, request=None):
+    return journal_article_doi(article, "update", request)
+
+def register_journal_doi(article, request=None):
+    return journal_article_doi(article, "register", request)
+
+def assign_article_doi(**kwargs):
+    article = kwargs.get('article')
+    if not article.get_doi():
+        id = id_logic.generate_crossref_doi_with_pattern(article)
