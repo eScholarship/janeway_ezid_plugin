@@ -65,6 +65,19 @@
                     <year>{{ article.date_published.year }}</year>
                 </publication_date>
                 {% endif %}
+                {% if article.license %}
+		<crossmark>
+                    <crossmark_version>1</crossmark_version>
+                    <crossmark_policy>10.5555/hK7vasW</crossmark_policy>
+                    <custom_metadata>    
+		    	<program xmlns="http://www.crossref.org/AccessIndicators.xsd">
+				<free_to_read/>
+				<license_ref>{{article.license.url}}</license_ref>
+
+			</program>
+		    </custom_metadata>
+	        </crossmark>
+                {% endif %}
                 <doi_data>
                     {% with doi=article.get_doi %}
                       {% if doi %}
@@ -72,8 +85,10 @@
                       {% endif %}
                     {% endwith %}
                     <resource>{{ target_url }}</resource>
-                </doi_data>
-            </journal_article>
+	        </doi_data>
+
+
+	     </journal_article>
         </journal>
     </body>
 </doi_batch>
