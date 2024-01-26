@@ -66,7 +66,6 @@
                 </publication_date>
                 {% endif %}
 		{% if article.license %}
-
 		<program xmlns="http://www.crossref.org/AccessIndicators.xsd">
 			<free_to_read/>
 			<license_ref>{{article.license.url}}</license_ref>
@@ -80,8 +79,6 @@
                     {% endwith %}
                     <resource>{{ target_url }}</resource>
 	        </doi_data>
-
-
 	     </journal_article>
         </journal>
     </body>
