@@ -67,6 +67,21 @@ When an article is pushed to eScholarship with the janeway to escholarship plugi
 * `register_journal_ezid_doi` *`article_id`* - Article should already have an Identifier of type "DOI" assigned to it.  Register it.
 * `update_journal_ezid_doi` *`article_id`* - Send an update request for an already registered DOI.  The caller is expected to track the status of the DOI.
 
+## Tests
+
+The test suite can be run in the context of a janeway development environment.  The general command (assuming the plugin is installed in a directory called 'ezid'):
+
+```
+python src/manage.py test ezid
+```
+
+If you are using a lando development environment:
+```
+lando manage test ezid
+```
+
+Tests cannot be run on dev/stg/prd servers because it requires creating a new database in order to test in a known environment.
+
 ## Contributing
 
 1. Fork it!

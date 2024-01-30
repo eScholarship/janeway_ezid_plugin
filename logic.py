@@ -21,7 +21,6 @@ from identifiers import logic as id_logic
 
 from django.contrib import messages
 
-
 from plugins.ezid.models import RepoEZIDSettings
 
 logger = get_logger(__name__)
@@ -131,7 +130,9 @@ def send_request(method, path, data, username, password, endpoint_url):
         return response
 
 def prepare_payload(ezid_metadata, template, target_url, owner):
-    metadata = render_to_string(template, ezid_metadata).replace('\n', '').replace('\r', '')
+    # normalize xml output by collapsing all whitespace to a single space
+    _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
+    metadata = _RE_COMBINE_WHITESPACE.sub(" ", render_to_string(template, ezid_metadata)).strip()
     payload = f"crossref: {metadata}\n_crossref: yes\n_profile: crossref\n_target: {target_url}\n_owner: {owner}"
     return payload
 
