@@ -244,13 +244,13 @@ def journal_article_doi(article, action, request):
     if get_setting('ezid_plugin_enable', article.journal):
         if not is_valid_issn(article.journal.issn) and not is_valid_url(article.journal.issn):
             msg = f"Invalid ISSN {article.journal.issn} for {article.journal}"
-            if request: messages.error(msg)
+            if request: messages.error(request, msg)
             return True, False, msg
 
         ezid_metadata = get_journal_metadata(article)
         if not ezid_metadata["doi"] and action != "mint":
             msg = f"{article} not assigned a DOI"
-            if request: messages.error(msg)
+            if request: messages.error(request, msg)
             return True, False, msg
         template = get_journal_template(article.journal)
 
