@@ -288,5 +288,6 @@ def register_journal_doi(article, request=None):
 
 def assign_article_doi(**kwargs):
     article = kwargs.get('article')
-    if not article.get_doi():
-        id = id_logic.generate_crossref_doi_with_pattern(article)
+    if get_setting('ezid_plugin_enable', article.journal):
+        if not article.get_doi():
+            id = id_logic.generate_crossref_doi_with_pattern(article)
