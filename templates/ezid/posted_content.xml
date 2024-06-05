@@ -4,6 +4,9 @@
   {% if contributors %}
   <contributors>
       {% for contributor in contributors %}
+      {% if a.is_corporate %}
+        <organization>{{ a.institution }}</organization>
+      {% else %}
       <person_name contributor_role="author" {% if forloop.first %}sequence="first"{% else %}sequence="additional"{% endif %}>
           <given_name>{{ contributor.given_name|striptags|escape }}</given_name>
           <surname>{{ contributor.surname|striptags|escape }}</surname>
@@ -11,6 +14,7 @@
           <ORCID>{{ contributor.ORCID }}</ORCID>
           {% endif %}
       </person_name>
+      {% endif %}
       {% endfor %}
   </contributors>
   {% endif %}
