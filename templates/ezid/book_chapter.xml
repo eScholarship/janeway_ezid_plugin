@@ -35,6 +35,9 @@
 			<content_item component_type="chapter" publication_type="full_text" language="en">
 				<contributors>
 					{% for a in article.frozen_authors.all %}
+					{% if a.is_corporate %}
+						<organization>{{ a.institution }}</organization>
+					{% else %}
 					<person_name contributor_role="author" sequence="{% if a.order == 0 %}first{% else %}additional{% endif %}">
 						<given_name>{{ a.given_names }}</given_name>
 						<surname>{{ a.last_name }}</surname>
@@ -42,6 +45,7 @@
 						<ORCID>https://orcid.org/{{ a.orcid }}</ORCID>
 						{% endif %}
 					</person_name>
+					{% endif %}
 					{% endfor %}
 				</contributors>
 				<titles>

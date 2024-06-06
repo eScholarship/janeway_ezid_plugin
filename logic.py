@@ -267,7 +267,7 @@ def journal_article_doi(article, action, request):
 
         if not username or not password or not endpoint_url or not owner:
             msg = f"EZID not fully configured for {article.journal}"
-            if request: messages.error(msg)
+            if request: messages.error(request, msg)
             return True, False, msg
 
         path = f'id/doi:{encode(ezid_metadata["doi"])}'
@@ -277,7 +277,7 @@ def journal_article_doi(article, action, request):
         return True, (doi != None), ezid_result
     else:
         msg = f"EZID not enabled for {article.journal}"
-        if request: messages.warning(msg)
+        if request: messages.warning(request, msg)
         return False, False, msg
 
 def update_journal_doi(article, request=None):
@@ -288,5 +288,6 @@ def register_journal_doi(article, request=None):
 
 def assign_article_doi(**kwargs):
     article = kwargs.get('article')
-    if not article.get_doi():
-        id = id_logic.generate_crossref_doi_with_pattern(article)
+    if get_setting('ezid_plugin_enable', article.journal):
+        if not article.get_doi():
+            id = id_logic.generate_crossref_doi_with_pattern(article)
