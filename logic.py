@@ -163,7 +163,8 @@ def get_preprint_metadata(preprint):
                      'title': escape_str(preprint.title),
                      'published_date': get_date_dict(preprint.date_published),
                      'accepted_date': get_date_dict(preprint.date_accepted),
-                     'abstract': escape_str(preprint.abstract)}
+                     'abstract': escape_str(preprint.abstract),
+                     'license': preprint.license.url if preprint.license else None}
 
     if preprint.doi:
         if is_valid_url(preprint.doi):
