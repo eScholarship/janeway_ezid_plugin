@@ -164,7 +164,9 @@ def get_preprint_metadata(preprint):
                      'published_date': get_date_dict(preprint.date_published),
                      'accepted_date': get_date_dict(preprint.date_accepted),
                      'abstract': escape_str(preprint.abstract),
-                     'license': preprint.license.url if preprint.license else None}
+                     'license': preprint.license.url if preprint.license else None, 
+                     'site_url': preprint.repository.site_url,
+                     'download_url': preprint.current_version.file.download_url if preprint.current_version.file else None}
 
     if preprint.doi:
         if is_valid_url(preprint.doi):
