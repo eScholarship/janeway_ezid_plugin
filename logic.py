@@ -232,7 +232,6 @@ def get_journal_metadata(article):
     itemId = 'qt'+ article.remote_url[-8:]
     # build content download url
     download_url = f'https://escholarship.org/content/{itemId}/{itemId}.pdf'
-    print("DOWNLOAD " + download_url)
     return {'now': timezone.now(),
             'target_url': article.remote_url,
             'article': article,
