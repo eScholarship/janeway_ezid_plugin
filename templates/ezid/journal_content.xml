@@ -81,7 +81,16 @@
                         <doi>{{ doi }}</doi>
                       {% endif %}
                     {% endwith %}
-                    <resource>{{ target_url }}</resource>
+		    <resource>{{ target_url }}</resource>
+                    {% if download_url %}
+                    <collection property="text-mining">
+                      <item>
+                        <resource mime_type="application/pdf">
+                          {{ download_url }}
+                        </resource>
+                      </item>
+	            </collection>
+                    {% endif %}  
                 </doi_data>
             </journal_article>
         </journal>

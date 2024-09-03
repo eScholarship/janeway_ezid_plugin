@@ -228,6 +228,11 @@ def get_setting(name, journal):
     return setting_handler.get_setting('plugin:ezid', name, journal).processed_value
 
 def get_journal_metadata(article):
+    # get remote_url from articles
+    itemId = 'qt'+ article.remote_url[-8:]
+    # build content download url
+    download_url = f'https://escholarship.org/content/{itemId}/{itemId}.pdf'
+    print("DOWNLOAD " + download_url)
     return {'now': timezone.now(),
             'target_url': article.remote_url,
             'article': article,
@@ -236,7 +241,8 @@ def get_journal_metadata(article):
             'doi': article.get_doi(),
             'depositor_name': setting_handler.get_setting('Identifiers', 'crossref_name', article.journal).processed_value,
             'depositor_email': setting_handler.get_setting('Identifiers', 'crossref_email', article.journal).processed_value,
-            'registrant': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,}
+            'registrant': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,
+            'download_url': download_url,}
 
 def get_journal_template(journal):
     return 'ezid/book_chapter.xml' if get_setting('ezid_book_chapter', journal) else 'ezid/journal_content.xml'
