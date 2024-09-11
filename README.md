@@ -80,7 +80,7 @@ If you are using a lando development environment:
 lando manage test ezid
 ```
 
-Tests cannot be run on dev/stg/prd servers because it requires creating a new database in order to test in a known environment.
+Tests cannot be run on stg/prd servers because it requires creating a new database in order to test in a known environment. It can run on dev server and other custom installations. 
 
 ## Contributing
 
