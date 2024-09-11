@@ -228,10 +228,12 @@ def get_setting(name, journal):
     return setting_handler.get_setting('plugin:ezid', name, journal).processed_value
 
 def get_journal_metadata(article):
-    # get remote_url from articles
-    itemId = 'qt'+ article.remote_url[-8:]
-    # build content download url
-    download_url = f'https://escholarship.org/content/{itemId}/{itemId}.pdf'
+    download_url = None
+    if article.remote_url:
+        # get id from url and add prefix to prepare item id
+        itemId = 'qt'+ article.remote_url[-8:]
+        # build content download url
+        download_url = f'https://escholarship.org/content/{itemId}/{itemId}.pdf'
     return {'now': timezone.now(),
             'target_url': article.remote_url,
             'article': article,
