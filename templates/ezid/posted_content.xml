@@ -60,6 +60,15 @@
   <doi_data>
     <doi>10.50505/preprint_sample_doi_2</doi>
     <resource>https://escholarship.org/</resource>
+    {% if download_url %}
+    <collection property="text-mining">
+      <item>
+        <resource mime_type="application/pdf">
+          {{ site_url }}{{ download_url }}
+        </resource>
+      </item>
+    </collection>  
+    {% endif %}
   </doi_data>
   {% endif %}
 </posted_content>
