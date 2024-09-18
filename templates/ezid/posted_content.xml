@@ -36,7 +36,7 @@
     <jats:p>{{ abstract|striptags|escape }}</jats:p>
   </jats:abstract>
   {% endif %}
-  {% if license %}
+  {% if license and license.strip%}
   <program xmlns="http://www.crossref.org/AccessIndicators.xsd">
       <free_to_read/>
       <license_ref>{{license }}</license_ref>

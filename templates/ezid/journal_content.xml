@@ -69,7 +69,7 @@
                     <year>{{ article.date_published.year }}</year>
                 </publication_date>
 		{% endif %}
-		{% if article.license %}
+		{% if article.license and article.license.url and article.license.url.strip %}
 		<program xmlns="http://www.crossref.org/AccessIndicators.xsd">
 			<free_to_read/>
 			<license_ref>{{article.license.url}}</license_ref>
