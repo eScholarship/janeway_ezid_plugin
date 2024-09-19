@@ -36,6 +36,14 @@ def get_valid_orcid(orcid):
     match = regex.match(str(orcid))
     return orcid if bool(match) else None
 
+
+def get_license_url(article):
+    if article and article.license and article.license.url :
+        url = article.license.url
+        if url.startswith('http'):
+            return url
+    return None
+
 def normalize_author_metadata(preprint_authors):
     ''' returns a list of authors in dictionary format using a list of author objects '''
     #example: {"given_name": "Hardy", "surname": "Pottinger", "ORCID": "https://orcid.org/0000-0001-8549-9354"},
@@ -164,7 +172,7 @@ def get_preprint_metadata(preprint):
                      'published_date': get_date_dict(preprint.date_published),
                      'accepted_date': get_date_dict(preprint.date_accepted),
                      'abstract': escape_str(preprint.abstract),
-                     'license': preprint.license.url if preprint.license else None}
+                     'license_url': get_license_url(preprint)}
 
     if preprint.doi:
         if is_valid_url(preprint.doi):
@@ -243,7 +251,8 @@ def get_journal_metadata(article):
             'depositor_name': setting_handler.get_setting('Identifiers', 'crossref_name', article.journal).processed_value,
             'depositor_email': setting_handler.get_setting('Identifiers', 'crossref_email', article.journal).processed_value,
             'registrant': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,
-            'download_url': download_url,}
+            'download_url': download_url,
+            'license_url': get_license_url(article)}
 
 def get_journal_template(journal):
     return 'ezid/book_chapter.xml' if get_setting('ezid_book_chapter', journal) else 'ezid/journal_content.xml'

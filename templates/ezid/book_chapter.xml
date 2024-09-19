@@ -31,10 +31,10 @@
           <publisher_name>eScholarship Publishing</publisher_name>
           <publisher_place>Oakland,CA</publisher_place>
         </publisher>
-        {% if article.license %}
+        {% if license_url%}
         <program xmlns="http://www.crossref.org/AccessIndicators.xsd">
           <free_to_read/>
-          <license_ref>{{article.license.url}}</license_ref>
+          <license_ref>{{license_url}}</license_ref>
 
         </program>
         {% endif %}
