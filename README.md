@@ -4,6 +4,8 @@ A plugin for [Janeway](https://janeway.systems/), enables minting of DOIs (via [
 
 The plugin is triggered by the `preprint_publication` event. This event happens immediately after the button to send an acceptance e-mail is clicked.
 
+See also: [janeway_cdl_utils](https://github.com/eScholarship/janeway_cdl_utils)
+
 ## Installation
 
 1. Clone this repo into /path/to/janeway/src/plugins/
