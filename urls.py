@@ -1,8 +1,8 @@
-from django.conf.urls import url
+from django.urls import re_path
 
 from plugins.ezid import views
 
 
 urlpatterns = [
-    url(r'^manager/$', views.ezid_manager, name='ezid_manager'),
+    re_path(r'^manager/$', views.ezid_manager, name='ezid_manager'),
 ]
