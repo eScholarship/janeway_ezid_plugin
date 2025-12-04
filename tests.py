@@ -1,31 +1,28 @@
+import mock
+from datetime import datetime
+from freezegun import freeze_time
+
 from django.test import TestCase
 from django.core.management import call_command
 from django.template.loader import render_to_string
+from django.utils import timezone
+from django.core.cache import cache
 
+from identifiers.models import Identifier
+from repository.models import Repository
+from submission.models import Licence
 from utils.testing import helpers
 from utils import setting_handler, logger
 
 import plugins.ezid.logic as logic
-
 from plugins.ezid.models import RepoEZIDSettings
-from repository.models import Repository
-
-from datetime import datetime
-from django.utils import timezone
-
-import mock
-from django.core.cache import cache
-from freezegun import freeze_time
-
-from identifiers.models import Identifier
-from submission.models import Licence
 
 FROZEN_DATETIME = timezone.make_aware(timezone.datetime(2023, 1, 1, 0, 0, 0))
 
 class EZIDJournalTest(TestCase):
     def setUp(self):
         call_command('install_plugins', 'ezid')
-        self.user = helpers.create_user("user1@test.edu")        
+        self.user = helpers.create_user("user1@test.edu")
         self.press = helpers.create_press()
         self.journal, _ = helpers.create_journals()
         self.article = helpers.create_article(self.journal, remote_url="https://test.org/qtXXXXXX")
@@ -77,7 +74,7 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
 
         path = "id/doi:10.9999/TEST"
         payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_7</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <journal> <journal_metadata> <full_title>Journal One</full_title> <abbrev_title>Journal One</abbrev_title> <issn media_type="electronic">1111-1111</issn> </journal_metadata> <journal_article publication_type="full_text"> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </journal_article> </journal> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
@@ -99,7 +96,7 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
 
         path = "id/doi:10.9999/TEST"
         payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_9</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <journal> <journal_metadata> <full_title>Journal One</full_title> <abbrev_title>Journal One</abbrev_title> <issn media_type="electronic">1111-1111</issn> </journal_metadata> <journal_article publication_type="full_text"> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </journal_article> </journal> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
@@ -135,7 +132,7 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('plugin:ezid', 'ezid_book_chapter', self.journal, "1")
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         path = "id/doi:10.9999/TEST"
         payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_6</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <book book_type="edited_book"> <book_series_metadata language="en"> <series_metadata> <titles> <title>Journal One</title> </titles> <issn>1111-1111</issn> </series_metadata> <titles> <title>Journal One</title> </titles> <publication_date media_type="online"> <year></year> </publication_date> <noisbn reason="archive_volume"/> <publisher> <publisher_name>eScholarship Publishing</publisher_name> <publisher_place>Oakland,CA</publisher_place> </publisher> </book_series_metadata> <content_item component_type="chapter" publication_type="full_text" language="en"> <contributors> </contributors> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <publication_date media_type="online"> <month></month> <day></day> <year></year> </publication_date> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </content_item> </book> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
@@ -158,7 +155,7 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('plugin:ezid', 'ezid_book_chapter', self.journal, "1")
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         path = "id/doi:10.9999/TEST"
         payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_8</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <book book_type="edited_book"> <book_series_metadata language="en"> <series_metadata> <titles> <title>Journal One</title> </titles> <issn>1111-1111</issn> </series_metadata> <titles> <title>Journal One</title> </titles> <publication_date media_type="online"> <year></year> </publication_date> <noisbn reason="archive_volume"/> <publisher> <publisher_name>eScholarship Publishing</publisher_name> <publisher_place>Oakland,CA</publisher_place> </publisher> </book_series_metadata> <content_item component_type="chapter" publication_type="full_text" language="en"> <contributors> </contributors> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <publication_date media_type="online"> <month></month> <day></day> <year></year> </publication_date> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </content_item> </book> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
@@ -179,7 +176,7 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         self.article.license = self.license
         self.article.save()
         path = "id/doi:10.9999/TEST"
@@ -203,7 +200,7 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         self.article.remote_url = None
         self.article.save()
         path = "id/doi:10.9999/TEST"
@@ -227,7 +224,7 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         self.license.url = '  '
         self.license.save()
         self.article.license = self.license
