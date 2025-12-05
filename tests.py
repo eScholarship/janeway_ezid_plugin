@@ -1,4 +1,5 @@
 import mock
+import re
 from datetime import datetime
 from freezegun import freeze_time
 
@@ -18,6 +19,160 @@ import plugins.ezid.logic as logic
 from plugins.ezid.models import RepoEZIDSettings
 
 FROZEN_DATETIME = timezone.make_aware(timezone.datetime(2023, 1, 1, 0, 0, 0))
+
+JOURNAL_XML = \
+"""
+<?xml version="1.0" encoding="UTF-8"?>
+<doi_batch xmlns="http://www.crossref.org/schema/5.3.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           version="5.3.1"
+           xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
+    <head>
+        <doi_batch_id>JournalOne_20230101_{}</doi_batch_id>
+        <timestamp>1672531200</timestamp>
+        <depositor>
+            <depositor_name>crossref_test</depositor_name>
+            <email_address>user1@test.edu</email_address>
+        </depositor>
+        <registrant>crossref_registrant</registrant>
+    </head>
+    <body>
+        <journal>
+            <journal_metadata>
+                <full_title>Journal One</full_title>
+                <abbrev_title>Journal One</abbrev_title>
+                <issn media_type="electronic">1111-1111</issn>
+            </journal_metadata>
+            <journal_article publication_type="full_text">
+                <titles>
+                    <title>Test Article from Utils Testing Helpers</title>
+                </titles>
+                {}
+                <doi_data>
+                    <doi>10.9999/TEST</doi>
+                    <resource>{}</resource>
+                    {}
+                </doi_data>
+            </journal_article>
+        </journal>
+    </body>
+</doi_batch>
+"""
+
+DOWNLOAD_URL = \
+"""
+<collection property="text-mining">
+    <item>
+        <resource mime_type="application/pdf">
+            https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf
+        </resource>
+    </item>
+</collection>
+"""
+
+BOOK_XML = \
+"""
+<?xml version="1.0" encoding="UTF-8"?>
+<doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> 
+    <head>
+        <doi_batch_id>JournalOne_20230101_{}</doi_batch_id>
+        <timestamp>1672531200</timestamp>
+        <depositor>
+            <depositor_name>crossref_test</depositor_name>
+            <email_address>user1@test.edu</email_address>
+        </depositor>
+        <registrant>crossref_registrant</registrant>
+    </head>
+    <body>
+        <book book_type="edited_book">
+            <book_series_metadata language="en">
+                <series_metadata>
+                    <titles>
+                        <title>Journal One</title>
+                    </titles>
+                    <issn>1111-1111</issn>
+                </series_metadata>
+                <titles>
+                    <title>Journal One</title>
+                </titles>
+                <publication_date media_type="online"> 
+                    <year></year>
+                </publication_date>
+                <noisbn reason="archive_volume"/>
+                <publisher>
+                    <publisher_name>eScholarship Publishing</publisher_name>
+                    <publisher_place>Oakland,CA</publisher_place>
+                </publisher>
+            </book_series_metadata>
+            <content_item component_type="chapter" publication_type="full_text" language="en">
+                <contributors>
+                </contributors>
+                <titles>
+                    <title>Test Article from Utils Testing Helpers</title>
+                </titles>
+                <publication_date media_type="online">
+                    <month></month>
+                    <day></day>
+                    <year></year>
+                </publication_date>
+                {}
+                <doi_data>
+                    <doi>10.9999/TEST</doi>
+                    <resource>{}</resource>
+                    {}
+                </doi_data>
+            </content_item>
+        </book>
+    </body>
+</doi_batch>
+"""
+
+PREPRINT_XML = """
+<?xml version="1.0"?>
+<posted_content xmlns="http://www.crossref.org/schema/4.4.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xmlns:jats="http://www.ncbi.nlm.nih.gov/JATS1"
+                xsi:schemaLocation="http://www.crossref.org/schema/4.4.0 http://www.crossref.org/schema/deposit/crossref4.4.0.xsd"
+                type="preprint"> 
+    <group_title>Repo Subject</group_title>
+    <contributors>
+        <person_name contributor_role="author" sequence="first">
+            <given_name>User</given_name>
+            <surname>One</surname>
+        </person_name>
+    </contributors>
+    <titles>
+        <title>This is a Test Preprint</title>
+    </titles>
+    <posted_date>
+        <month>1</month>
+        <day>1</day>
+        <year>2023</year>
+    </posted_date>
+    <acceptance_date>
+        <month>1</month>
+        <day>1</day>
+        <year>2023</year>
+    </acceptance_date>
+    <jats:abstract>
+        <jats:p>This is a fake abstract.</jats:p>
+    </jats:abstract>
+    <!-- placeholder DOI, will be overwritten when DOI is minted -->
+    <doi_data>
+        <doi>10.50505/preprint_sample_doi_2</doi>
+        <resource>https://escholarship.org/</resource>
+        <collection property="text-mining">
+            <item>
+                <resource mime_type="application/pdf">
+                    http://localhost/testrepo{}
+                </resource>
+            </item>
+        </collection>
+    </doi_data>
+</posted_content>
+"""
+
+PAYLOAD = 'crossref: {}\n_crossref: yes\n_profile: crossref\n_target: {}\n_owner: {}'
 
 class EZIDJournalTest(TestCase):
     def setUp(self):
@@ -68,6 +223,15 @@ class EZIDJournalTest(TestCase):
         self.assertNotIn(self.article.title, cref_xml)
         self.assertNotIn("abstract", cref_xml)
 
+    def strip_payload(self, s):
+        _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
+        return _RE_COMBINE_WHITESPACE.sub(" ", s).strip()
+
+    def get_payload(self, xml, target_url="https://test.org/qtXXXXXX", owner="crossref_registrant", license_xml="", download=True):
+        dxml = DOWNLOAD_URL if download else ""
+        return PAYLOAD.format(self.strip_payload(xml.format(self.article.pk, license_xml, target_url, dxml)),
+                              target_url, owner)
+    
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_register_doi(self, mock_send):
@@ -77,7 +241,7 @@ class EZIDJournalTest(TestCase):
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
 
         path = "id/doi:10.9999/TEST"
-        payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_7</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <journal> <journal_metadata> <full_title>Journal One</full_title> <abbrev_title>Journal One</abbrev_title> <issn media_type="electronic">1111-1111</issn> </journal_metadata> <journal_article publication_type="full_text"> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </journal_article> </journal> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
+        payload = self.get_payload(JOURNAL_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
         endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
@@ -99,7 +263,7 @@ class EZIDJournalTest(TestCase):
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
 
         path = "id/doi:10.9999/TEST"
-        payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_9</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <journal> <journal_metadata> <full_title>Journal One</full_title> <abbrev_title>Journal One</abbrev_title> <issn media_type="electronic">1111-1111</issn> </journal_metadata> <journal_article publication_type="full_text"> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </journal_article> </journal> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
+        payload = self.get_payload(JOURNAL_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
         endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
@@ -134,7 +298,7 @@ class EZIDJournalTest(TestCase):
         cache.clear()
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         path = "id/doi:10.9999/TEST"
-        payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_6</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <book book_type="edited_book"> <book_series_metadata language="en"> <series_metadata> <titles> <title>Journal One</title> </titles> <issn>1111-1111</issn> </series_metadata> <titles> <title>Journal One</title> </titles> <publication_date media_type="online"> <year></year> </publication_date> <noisbn reason="archive_volume"/> <publisher> <publisher_name>eScholarship Publishing</publisher_name> <publisher_place>Oakland,CA</publisher_place> </publisher> </book_series_metadata> <content_item component_type="chapter" publication_type="full_text" language="en"> <contributors> </contributors> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <publication_date media_type="online"> <month></month> <day></day> <year></year> </publication_date> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </content_item> </book> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
+        payload = self.get_payload(BOOK_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
         endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
@@ -157,7 +321,7 @@ class EZIDJournalTest(TestCase):
         cache.clear()
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         path = "id/doi:10.9999/TEST"
-        payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_8</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <book book_type="edited_book"> <book_series_metadata language="en"> <series_metadata> <titles> <title>Journal One</title> </titles> <issn>1111-1111</issn> </series_metadata> <titles> <title>Journal One</title> </titles> <publication_date media_type="online"> <year></year> </publication_date> <noisbn reason="archive_volume"/> <publisher> <publisher_name>eScholarship Publishing</publisher_name> <publisher_place>Oakland,CA</publisher_place> </publisher> </book_series_metadata> <content_item component_type="chapter" publication_type="full_text" language="en"> <contributors> </contributors> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <publication_date media_type="online"> <month></month> <day></day> <year></year> </publication_date> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </content_item> </book> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
+        payload = self.get_payload(BOOK_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
         endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
@@ -180,7 +344,8 @@ class EZIDJournalTest(TestCase):
         self.article.license = self.license
         self.article.save()
         path = "id/doi:10.9999/TEST"
-        payload = 'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_11</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <journal> <journal_metadata> <full_title>Journal One</full_title> <abbrev_title>Journal One</abbrev_title> <issn media_type="electronic">1111-1111</issn> </journal_metadata> <journal_article publication_type="full_text"> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <program xmlns="http://www.crossref.org/AccessIndicators.xsd"> <free_to_read/> <license_ref>https://test.cc.org</license_ref> </program> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </journal_article> </journal> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
+        license_xml = '<program xmlns="http://www.crossref.org/AccessIndicators.xsd"> <free_to_read/> <license_ref>https://test.cc.org</license_ref> </program>'
+        payload = self.get_payload(JOURNAL_XML, license_xml=license_xml)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
         endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
@@ -204,7 +369,7 @@ class EZIDJournalTest(TestCase):
         self.article.remote_url = None
         self.article.save()
         path = "id/doi:10.9999/TEST"
-        payload = f'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_12</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <journal> <journal_metadata> <full_title>Journal One</full_title> <abbrev_title>Journal One</abbrev_title> <issn media_type="electronic">1111-1111</issn> </journal_metadata> <journal_article publication_type="full_text"> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <doi_data> <doi>10.9999/TEST</doi> <resource>None</resource> </doi_data> </journal_article> </journal> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: None\n_owner: crossref_registrant'
+        payload = self.get_payload(JOURNAL_XML, target_url=self.article.url, download=False)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
         endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
@@ -230,7 +395,7 @@ class EZIDJournalTest(TestCase):
         self.article.license = self.license
         self.article.save()
         path = "id/doi:10.9999/TEST"
-        payload = 'crossref: <?xml version="1.0" encoding="UTF-8"?> <doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> <head> <doi_batch_id>JournalOne_20230101_10</doi_batch_id> <timestamp>1672531200</timestamp> <depositor> <depositor_name>crossref_test</depositor_name> <email_address>user1@test.edu</email_address> </depositor> <registrant>crossref_registrant</registrant> </head> <body> <journal> <journal_metadata> <full_title>Journal One</full_title> <abbrev_title>Journal One</abbrev_title> <issn media_type="electronic">1111-1111</issn> </journal_metadata> <journal_article publication_type="full_text"> <titles> <title>Test Article from Utils Testing Helpers</title> </titles> <doi_data> <doi>10.9999/TEST</doi> <resource>https://test.org/qtXXXXXX</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf </resource> </item> </collection> </doi_data> </journal_article> </journal> </body> </doi_batch>\n_crossref: yes\n_profile: crossref\n_target: https://test.org/qtXXXXXX\n_owner: crossref_registrant'
+        payload = self.get_payload(JOURNAL_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
         endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
@@ -261,6 +426,14 @@ class EZIDPreprintTest(TestCase):
                                             ezid_username="username",
                                             ezid_password="password",
                                             ezid_endpoint_url="endpoint.org")
+
+    def strip_payload(self, s):
+        _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
+        return _RE_COMBINE_WHITESPACE.sub(" ", s).strip()
+
+    def get_payload(self, owner="owner"):
+        return PAYLOAD.format(self.strip_payload(PREPRINT_XML.format(self.preprint.current_version.file.download_url())),
+                                 self.preprint.url, owner)
 
     def test_preprint_metadata(self):
         metadata = logic.get_preprint_metadata(self.preprint)
@@ -353,7 +526,7 @@ class EZIDPreprintTest(TestCase):
     def test_preprint_update(self, mock_send):
         self.preprint.preprint_doi = "10.9999/TEST"
         path = "id/doi:10.9999/TEST"
-        payload = f'crossref: <?xml version="1.0"?> <posted_content xmlns="http://www.crossref.org/schema/4.4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jats="http://www.ncbi.nlm.nih.gov/JATS1" xsi:schemaLocation="http://www.crossref.org/schema/4.4.0 http://www.crossref.org/schema/deposit/crossref4.4.0.xsd" type="preprint"> <group_title>Repo Subject</group_title> <contributors> <person_name contributor_role="author" sequence="first"> <given_name>User</given_name> <surname>One</surname> </person_name> </contributors> <titles> <title>This is a Test Preprint</title> </titles> <posted_date> <month>1</month> <day>1</day> <year>2023</year> </posted_date> <acceptance_date> <month>1</month> <day>1</day> <year>2023</year> </acceptance_date> <jats:abstract> <jats:p>This is a fake abstract.</jats:p> </jats:abstract> <!-- placeholder DOI, will be overwritten when DOI is minted --> <doi_data> <doi>10.50505/preprint_sample_doi_2</doi> <resource>https://escholarship.org/</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> http://localhost/testrepo{self.preprint.current_version.file.download_url()} </resource> </item> </collection> </doi_data> </posted_content>\n_crossref: yes\n_profile: crossref\n_target: {self.preprint.url}\n_owner: owner'
+        payload = self.get_payload()
 
         enabled, success, msg = logic.update_preprint_doi(self.preprint)
 
@@ -370,8 +543,7 @@ class EZIDPreprintTest(TestCase):
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_preprint_mint(self, mock_send):
         path = "shoulder/shoulder"
-        payload = f'crossref: <?xml version="1.0"?> <posted_content xmlns="http://www.crossref.org/schema/4.4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jats="http://www.ncbi.nlm.nih.gov/JATS1" xsi:schemaLocation="http://www.crossref.org/schema/4.4.0 http://www.crossref.org/schema/deposit/crossref4.4.0.xsd" type="preprint"> <group_title>Repo Subject</group_title> <contributors> <person_name contributor_role="author" sequence="first"> <given_name>User</given_name> <surname>One</surname> </person_name> </contributors> <titles> <title>This is a Test Preprint</title> </titles> <posted_date> <month>1</month> <day>1</day> <year>2023</year> </posted_date> <acceptance_date> <month>1</month> <day>1</day> <year>2023</year> </acceptance_date> <jats:abstract> <jats:p>This is a fake abstract.</jats:p> </jats:abstract> <!-- placeholder DOI, will be overwritten when DOI is minted --> <doi_data> <doi>10.50505/preprint_sample_doi_2</doi> <resource>https://escholarship.org/</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> http://localhost/testrepo{self.preprint.current_version.file.download_url()} </resource> </item> </collection> </doi_data> </posted_content>\n_crossref: yes\n_profile: crossref\n_target: {self.preprint.url}\n_owner: owner'
-
+        payload = self.get_payload()
         enabled, success, msg = logic.mint_preprint_doi(self.preprint)
 
         s = RepoEZIDSettings.objects.get(repo=self.repo)
