@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.core.cache import cache
 
 from identifiers.models import Identifier
-from repository.models import Repository
+from repository.models import Repository, PreprintVersion
 from submission.models import Licence
 from utils.testing import helpers
 from utils import setting_handler, logger
@@ -251,6 +251,10 @@ class EZIDPreprintTest(TestCase):
         self.press = helpers.create_press()
         self.repo, self.subject = helpers.create_repository(self.press, [self.user], [self.user])
         self.preprint = helpers.create_preprint(self.repo, self.user, self.subject)
+        PreprintVersion.objects.create(preprint=self.preprint,
+                                       version=1,
+                                       file=self.preprint.submission_file)
+        self.preprint.save()
         s = RepoEZIDSettings.objects.create(repo=self.repo,
                                             ezid_shoulder="shoulder",
                                             ezid_owner="owner",
@@ -349,7 +353,7 @@ class EZIDPreprintTest(TestCase):
     def test_preprint_update(self, mock_send):
         self.preprint.preprint_doi = "10.9999/TEST"
         path = "id/doi:10.9999/TEST"
-        payload = f'crossref: <?xml version="1.0"?> <posted_content xmlns="http://www.crossref.org/schema/4.4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jats="http://www.ncbi.nlm.nih.gov/JATS1" xsi:schemaLocation="http://www.crossref.org/schema/4.4.0 http://www.crossref.org/schema/deposit/crossref4.4.0.xsd" type="preprint"> <group_title>Repo Subject</group_title> <contributors> <person_name contributor_role="author" sequence="first"> <given_name>User</given_name> <surname>One</surname> </person_name> </contributors> <titles> <title>This is a Test Preprint</title> </titles> <posted_date> <month>1</month> <day>1</day> <year>2023</year> </posted_date> <acceptance_date> <month>1</month> <day>1</day> <year>2023</year> </acceptance_date> <jats:abstract> <jats:p>This is a fake abstract.</jats:p> </jats:abstract> <!-- placeholder DOI, will be overwritten when DOI is minted --> <doi_data> <doi>10.50505/preprint_sample_doi_2</doi> <resource>https://escholarship.org/</resource> </doi_data> </posted_content>\n_crossref: yes\n_profile: crossref\n_target: {self.preprint.url}\n_owner: owner'
+        payload = f'crossref: <?xml version="1.0"?> <posted_content xmlns="http://www.crossref.org/schema/4.4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jats="http://www.ncbi.nlm.nih.gov/JATS1" xsi:schemaLocation="http://www.crossref.org/schema/4.4.0 http://www.crossref.org/schema/deposit/crossref4.4.0.xsd" type="preprint"> <group_title>Repo Subject</group_title> <contributors> <person_name contributor_role="author" sequence="first"> <given_name>User</given_name> <surname>One</surname> </person_name> </contributors> <titles> <title>This is a Test Preprint</title> </titles> <posted_date> <month>1</month> <day>1</day> <year>2023</year> </posted_date> <acceptance_date> <month>1</month> <day>1</day> <year>2023</year> </acceptance_date> <jats:abstract> <jats:p>This is a fake abstract.</jats:p> </jats:abstract> <!-- placeholder DOI, will be overwritten when DOI is minted --> <doi_data> <doi>10.50505/preprint_sample_doi_2</doi> <resource>https://escholarship.org/</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> http://localhost/testrepo{self.preprint.current_version.file.download_url()} </resource> </item> </collection> </doi_data> </posted_content>\n_crossref: yes\n_profile: crossref\n_target: {self.preprint.url}\n_owner: owner'
 
         enabled, success, msg = logic.update_preprint_doi(self.preprint)
 
@@ -366,7 +370,7 @@ class EZIDPreprintTest(TestCase):
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_preprint_mint(self, mock_send):
         path = "shoulder/shoulder"
-        payload = f'crossref: <?xml version="1.0"?> <posted_content xmlns="http://www.crossref.org/schema/4.4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jats="http://www.ncbi.nlm.nih.gov/JATS1" xsi:schemaLocation="http://www.crossref.org/schema/4.4.0 http://www.crossref.org/schema/deposit/crossref4.4.0.xsd" type="preprint"> <group_title>Repo Subject</group_title> <contributors> <person_name contributor_role="author" sequence="first"> <given_name>User</given_name> <surname>One</surname> </person_name> </contributors> <titles> <title>This is a Test Preprint</title> </titles> <posted_date> <month>1</month> <day>1</day> <year>2023</year> </posted_date> <acceptance_date> <month>1</month> <day>1</day> <year>2023</year> </acceptance_date> <jats:abstract> <jats:p>This is a fake abstract.</jats:p> </jats:abstract> <!-- placeholder DOI, will be overwritten when DOI is minted --> <doi_data> <doi>10.50505/preprint_sample_doi_2</doi> <resource>https://escholarship.org/</resource> </doi_data> </posted_content>\n_crossref: yes\n_profile: crossref\n_target: {self.preprint.url}\n_owner: owner'
+        payload = f'crossref: <?xml version="1.0"?> <posted_content xmlns="http://www.crossref.org/schema/4.4.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:jats="http://www.ncbi.nlm.nih.gov/JATS1" xsi:schemaLocation="http://www.crossref.org/schema/4.4.0 http://www.crossref.org/schema/deposit/crossref4.4.0.xsd" type="preprint"> <group_title>Repo Subject</group_title> <contributors> <person_name contributor_role="author" sequence="first"> <given_name>User</given_name> <surname>One</surname> </person_name> </contributors> <titles> <title>This is a Test Preprint</title> </titles> <posted_date> <month>1</month> <day>1</day> <year>2023</year> </posted_date> <acceptance_date> <month>1</month> <day>1</day> <year>2023</year> </acceptance_date> <jats:abstract> <jats:p>This is a fake abstract.</jats:p> </jats:abstract> <!-- placeholder DOI, will be overwritten when DOI is minted --> <doi_data> <doi>10.50505/preprint_sample_doi_2</doi> <resource>https://escholarship.org/</resource> <collection property="text-mining"> <item> <resource mime_type="application/pdf"> http://localhost/testrepo{self.preprint.current_version.file.download_url()} </resource> </item> </collection> </doi_data> </posted_content>\n_crossref: yes\n_profile: crossref\n_target: {self.preprint.url}\n_owner: owner'
 
         enabled, success, msg = logic.mint_preprint_doi(self.preprint)
 
