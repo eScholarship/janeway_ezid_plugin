@@ -212,6 +212,10 @@ class EZIDJournalTest(TestCase):
         setting_handler.save_setting('plugin:ezid', 'ezid_plugin_username', self.journal, "username")
         setting_handler.save_setting('plugin:ezid', 'ezid_plugin_password', self.journal, "password")
 
+        self.username = logic.get_setting('ezid_plugin_username', self.article.journal)
+        self.password = logic.get_setting('ezid_plugin_password', self.article.journal)
+        self.endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
+
     def test_journal_metadata(self):
         metadata = logic.get_journal_metadata(self.article)
         self.assertEqual(metadata["target_url"], "https://test.org/qtXXXXXX")
@@ -263,13 +267,10 @@ class EZIDJournalTest(TestCase):
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
 
         payload = self.get_payload(JOURNAL_XML)
-        username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
         enabled, success, msg = logic.register_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("PUT", EZID_PATH, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("PUT", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -284,13 +285,10 @@ class EZIDJournalTest(TestCase):
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
 
         payload = self.get_payload(JOURNAL_XML)
-        username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -318,13 +316,10 @@ class EZIDJournalTest(TestCase):
         cache.clear()
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         payload = self.get_payload(BOOK_XML)
-        username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
         enabled, success, msg = logic.register_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("PUT", EZID_PATH, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("PUT", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -340,13 +335,10 @@ class EZIDJournalTest(TestCase):
         cache.clear()
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         payload = self.get_payload(BOOK_XML)
-        username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -365,13 +357,10 @@ class EZIDJournalTest(TestCase):
                             <free_to_read/> <license_ref>https://test.cc.org</license_ref>
                         </program>"""
         payload = self.get_payload(JOURNAL_XML, license_xml=license_xml)
-        username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -388,13 +377,10 @@ class EZIDJournalTest(TestCase):
         self.article.remote_url = None
         self.article.save()
         payload = self.get_payload(JOURNAL_XML, target_url=self.article.url, download=False)
-        username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -413,13 +399,10 @@ class EZIDJournalTest(TestCase):
         self.article.license = self.license
         self.article.save()
         payload = self.get_payload(JOURNAL_XML)
-        username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -438,13 +421,10 @@ class EZIDJournalTest(TestCase):
         author.save()
 
         payload = self.get_payload(JOURNAL_XML)
-        username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -461,12 +441,12 @@ class EZIDPreprintTest(TestCase):
                                        version=1,
                                        file=self.preprint.submission_file)
         self.preprint.save()
-        s = RepoEZIDSettings.objects.create(repo=self.repo,
-                                            ezid_shoulder="shoulder",
-                                            ezid_owner="owner",
-                                            ezid_username="username",
-                                            ezid_password="password",
-                                            ezid_endpoint_url="endpoint.org")
+        self.settings = RepoEZIDSettings.objects.create(repo=self.repo,
+                                                        ezid_shoulder="shoulder",
+                                                        ezid_owner="owner",
+                                                        ezid_username="username",
+                                                        ezid_password="password",
+                                                        ezid_endpoint_url="endpoint.org")
 
     def strip_payload(self, s):
         _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
@@ -558,7 +538,7 @@ class EZIDPreprintTest(TestCase):
 
         preprint2 = helpers.create_preprint(repo2, self.user, self.subject)
 
-        enabled, success, msg = logic.mint_preprint_doi(preprint2)
+        enabled, _success, _msg = logic.mint_preprint_doi(preprint2)
 
         self.assertFalse(enabled)
 
@@ -571,9 +551,14 @@ class EZIDPreprintTest(TestCase):
 
         enabled, success, msg = logic.update_preprint_doi(self.preprint)
 
-        s = RepoEZIDSettings.objects.get(repo=self.repo)
-
-        mock_send.assert_called_once_with("POST", path, payload, s.ezid_username, s.ezid_password, s.ezid_endpoint_url)
+        mock_send.assert_called_once_with(
+            "POST",
+            path,
+            payload,
+            self.settings.ezid_username,
+            self.settings.ezid_password,
+            self.settings.ezid_endpoint_url
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -587,9 +572,14 @@ class EZIDPreprintTest(TestCase):
         payload = self.get_payload()
         enabled, success, msg = logic.mint_preprint_doi(self.preprint)
 
-        s = RepoEZIDSettings.objects.get(repo=self.repo)
-
-        mock_send.assert_called_once_with("POST", path, payload, s.ezid_username, s.ezid_password, s.ezid_endpoint_url)
+        mock_send.assert_called_once_with(
+            "POST",
+            path,
+            payload,
+            self.settings.ezid_username,
+            self.settings.ezid_password,
+            self.settings.ezid_endpoint_url
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -605,9 +595,14 @@ class EZIDPreprintTest(TestCase):
         payload = self.get_payload()
         enabled, success, msg = logic.mint_preprint_doi(self.preprint)
 
-        s = RepoEZIDSettings.objects.get(repo=self.repo)
-
-        mock_send.assert_called_once_with("POST", path, payload, s.ezid_username, s.ezid_password, s.ezid_endpoint_url)
+        mock_send.assert_called_once_with(
+            "POST",
+            path,
+            payload,
+            self.settings.ezid_username,
+            self.settings.ezid_password,
+            self.settings.ezid_endpoint_url
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
