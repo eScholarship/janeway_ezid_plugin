@@ -189,6 +189,8 @@ PREPRINT_XML = """
 
 PAYLOAD = 'crossref: {}\n_crossref: yes\n_profile: crossref\n_target: {}\n_owner: {}'
 
+EZID_PATH = 'id/doi:10.9999/TEST'
+
 class EZIDJournalTest(TestCase):
     def setUp(self):
         call_command('install_plugins', 'ezid')
@@ -259,7 +261,6 @@ class EZIDJournalTest(TestCase):
         cache.clear()
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
 
-        path = "id/doi:10.9999/TEST"
         payload = self.get_payload(JOURNAL_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
@@ -267,7 +268,7 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.register_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("PUT", path, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("PUT", EZID_PATH, payload, username, password, endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -281,7 +282,6 @@ class EZIDJournalTest(TestCase):
         cache.clear()
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
 
-        path = "id/doi:10.9999/TEST"
         payload = self.get_payload(JOURNAL_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
@@ -289,7 +289,7 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", path, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -316,7 +316,6 @@ class EZIDJournalTest(TestCase):
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
-        path = "id/doi:10.9999/TEST"
         payload = self.get_payload(BOOK_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
@@ -324,7 +323,7 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.register_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("PUT", path, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("PUT", EZID_PATH, payload, username, password, endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -339,7 +338,6 @@ class EZIDJournalTest(TestCase):
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
-        path = "id/doi:10.9999/TEST"
         payload = self.get_payload(BOOK_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
@@ -347,7 +345,7 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", path, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -362,7 +360,6 @@ class EZIDJournalTest(TestCase):
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         self.article.license = self.license
         self.article.save()
-        path = "id/doi:10.9999/TEST"
         license_xml = """<program xmlns="http://www.crossref.org/AccessIndicators.xsd">
                             <free_to_read/> <license_ref>https://test.cc.org</license_ref>
                         </program>"""
@@ -373,7 +370,7 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", path, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -389,7 +386,6 @@ class EZIDJournalTest(TestCase):
         _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         self.article.remote_url = None
         self.article.save()
-        path = "id/doi:10.9999/TEST"
         payload = self.get_payload(JOURNAL_XML, target_url=self.article.url, download=False)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
@@ -397,7 +393,7 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", path, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -415,7 +411,6 @@ class EZIDJournalTest(TestCase):
         self.license.save()
         self.article.license = self.license
         self.article.save()
-        path = "id/doi:10.9999/TEST"
         payload = self.get_payload(JOURNAL_XML)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
@@ -423,11 +418,37 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", path, payload, username, password, endpoint_url)
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
 
         self.assertTrue(enabled)
         self.assertTrue(success)
         self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
+
+    @freeze_time(FROZEN_DATETIME)
+    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    def test_orcid_url(self, mock_send):
+        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
+        # if we don't clear the cache we get the old, invalid ISSN
+        cache.clear()
+        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+
+        author = self.article.authors.all()[0]
+        author.orcid = "https://orcid.org/1234-5678-9012-345X"
+        author.save()
+
+        payload = self.get_payload(JOURNAL_XML)
+        username = logic.get_setting('ezid_plugin_username', self.article.journal)
+        password = logic.get_setting('ezid_plugin_password', self.article.journal)
+        endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
+
+        enabled, success, msg = logic.update_journal_doi(self.article)
+
+        mock_send.assert_called_once_with("POST", EZID_PATH, payload, username, password, endpoint_url)
+
+        self.assertTrue(enabled)
+        self.assertTrue(success)
+        self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
+
 
 class EZIDPreprintTest(TestCase):
     def setUp(self):
