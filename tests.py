@@ -216,12 +216,18 @@ class EZIDJournalTest(TestCase):
         self.password = logic.get_setting('ezid_plugin_password', self.article.journal)
         self.endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
 
+        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
+        # if we don't clear the cache we get the old, invalid ISSN
+        cache.clear()
+        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+
+
     def test_journal_metadata(self):
         metadata = logic.get_journal_metadata(self.article)
         self.assertEqual(metadata["target_url"], "https://test.org/qtXXXXXX")
         self.assertEqual(metadata["title"], self.article.title)
         self.assertIsNone(metadata["abstract"])
-        self.assertIsNone(metadata["doi"])
+        self.assertEqual(metadata["doi"], "10.9999/TEST")
         self.assertEqual(metadata["depositor_name"], "crossref_test")
         self.assertEqual(metadata["depositor_email"], "user1@test.edu")
         self.assertEqual(metadata["registrant"], "crossref_registrant")
@@ -234,7 +240,7 @@ class EZIDJournalTest(TestCase):
         self.assertEqual(metadata["target_url"], "https://test.org/qtXXXXXX")
         self.assertEqual(metadata["title"], "This is the title with a %25")
         self.assertIsNone(metadata["abstract"])
-        self.assertIsNone(metadata["doi"])
+        self.assertEqual(metadata["doi"], "10.9999/TEST")
         self.assertEqual(metadata["depositor_name"], "crossref_test")
         self.assertEqual(metadata["depositor_email"], "user1@test.edu")
         self.assertEqual(metadata["registrant"], "crossref_registrant")
@@ -261,11 +267,6 @@ class EZIDJournalTest(TestCase):
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_register_doi(self, mock_send):
-        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
-        # if we don't clear the cache we get the old, invalid ISSN
-        cache.clear()
-        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
-
         payload = self.get_payload(JOURNAL_XML)
 
         enabled, success, msg = logic.register_journal_doi(self.article)
@@ -279,11 +280,6 @@ class EZIDJournalTest(TestCase):
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_update_doi(self, mock_send):
-        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
-        # if we don't clear the cache we get the old, invalid ISSN
-        cache.clear()
-        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
-
         payload = self.get_payload(JOURNAL_XML)
 
         enabled, success, msg = logic.update_journal_doi(self.article)
@@ -295,6 +291,8 @@ class EZIDJournalTest(TestCase):
         self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
 
     def test_no_issn(self):
+        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "")
+        cache.clear()
         enabled, success, msg = logic.register_journal_doi(self.article)
 
         self.assertTrue(enabled)
@@ -310,11 +308,8 @@ class EZIDJournalTest(TestCase):
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_register_bookchapter_doi(self, mock_send):
-        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
         setting_handler.save_setting('plugin:ezid', 'ezid_book_chapter', self.journal, "1")
-        # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         payload = self.get_payload(BOOK_XML)
 
         enabled, success, msg = logic.register_journal_doi(self.article)
@@ -329,11 +324,8 @@ class EZIDJournalTest(TestCase):
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_update_bookchapter_doi(self, mock_send):
-        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
         setting_handler.save_setting('plugin:ezid', 'ezid_book_chapter', self.journal, "1")
-        # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         payload = self.get_payload(BOOK_XML)
 
         enabled, success, msg = logic.update_journal_doi(self.article)
@@ -347,10 +339,6 @@ class EZIDJournalTest(TestCase):
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_with_license_doi(self, mock_send):
-        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
-        # if we don't clear the cache we get the old, invalid ISSN
-        cache.clear()
-        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         self.article.license = self.license
         self.article.save()
         license_xml = """<program xmlns="http://www.crossref.org/AccessIndicators.xsd">
@@ -370,10 +358,6 @@ class EZIDJournalTest(TestCase):
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_without_remoteurl_doi(self, mock_send):
-        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
-        # if we don't clear the cache we get the old, invalid ISSN
-        cache.clear()
-        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         self.article.remote_url = None
         self.article.save()
         payload = self.get_payload(JOURNAL_XML, target_url=self.article.url, download=False)
@@ -390,10 +374,6 @@ class EZIDJournalTest(TestCase):
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_with_empty_license_doi(self, mock_send):
-        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
-        # if we don't clear the cache we get the old, invalid ISSN
-        cache.clear()
-        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
         self.license.url = '  '
         self.license.save()
         self.article.license = self.license
@@ -411,11 +391,6 @@ class EZIDJournalTest(TestCase):
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_orcid_url(self, mock_send):
-        setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
-        # if we don't clear the cache we get the old, invalid ISSN
-        cache.clear()
-        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
-
         author = self.article.authors.all()[0]
         author.orcid = "https://orcid.org/1234-5678-9012-345X"
         author.save()
