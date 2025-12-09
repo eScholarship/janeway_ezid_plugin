@@ -73,7 +73,10 @@ DOWNLOAD_URL = \
 BOOK_XML = \
 """
 <?xml version="1.0" encoding="UTF-8"?>
-<doi_batch xmlns="http://www.crossref.org/schema/5.3.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="5.3.1" xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd"> 
+<doi_batch xmlns="http://www.crossref.org/schema/5.3.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           version="5.3.1"
+           xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
     <head>
         <doi_batch_id>JournalOne_20230101_{}</doi_batch_id>
         <timestamp>1672531200</timestamp>
@@ -344,7 +347,9 @@ class EZIDJournalTest(TestCase):
         self.article.license = self.license
         self.article.save()
         path = "id/doi:10.9999/TEST"
-        license_xml = '<program xmlns="http://www.crossref.org/AccessIndicators.xsd"> <free_to_read/> <license_ref>https://test.cc.org</license_ref> </program>'
+        license_xml = """<program xmlns="http://www.crossref.org/AccessIndicators.xsd">
+                            <free_to_read/> <license_ref>https://test.cc.org</license_ref>
+                        </program>"""
         payload = self.get_payload(JOURNAL_XML, license_xml=license_xml)
         username = logic.get_setting('ezid_plugin_username', self.article.journal)
         password = logic.get_setting('ezid_plugin_password', self.article.journal)
