@@ -154,6 +154,7 @@ PREPRINT_XML = """
         <person_name contributor_role="author" sequence="first">
             <given_name>User</given_name>
             <surname>One</surname>
+            <ORCID>https://orcid.org/0000-0001-2345-6789</ORCID>
         </person_name>
     </contributors>
     <titles>
@@ -452,9 +453,7 @@ class EZIDJournalTest(TestCase):
 
 class EZIDPreprintTest(TestCase):
     def setUp(self):
-        call_command('install_plugins', 'ezid')
-        #call_command('migrate', 'ezid')
-        self.user = helpers.create_user("user1@test.edu", first_name="User", last_name="One")
+        self.user = helpers.create_user("user1@test.edu", first_name="User", last_name="One", orcid="0000-0001-2345-6789")
         self.press = helpers.create_press()
         self.repo, self.subject = helpers.create_repository(self.press, [self.user], [self.user])
         self.preprint = helpers.create_preprint(self.repo, self.user, self.subject)
@@ -584,6 +583,24 @@ class EZIDPreprintTest(TestCase):
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_preprint_mint(self, mock_send):
+        path = "shoulder/shoulder"
+        payload = self.get_payload()
+        enabled, success, msg = logic.mint_preprint_doi(self.preprint)
+
+        s = RepoEZIDSettings.objects.get(repo=self.repo)
+
+        mock_send.assert_called_once_with("POST", path, payload, s.ezid_username, s.ezid_password, s.ezid_endpoint_url)
+
+        self.assertTrue(enabled)
+        self.assertTrue(success)
+        self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
+        self.assertEqual(self.preprint.preprint_doi, "10.9999/TEST")
+
+    @freeze_time(FROZEN_DATETIME)
+    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    def test_preprint_orcid_url(self, mock_send):
+        self.user.orcid = "https://orcid.org/0000-0001-2345-6789"
+        self.user.save()
         path = "shoulder/shoulder"
         payload = self.get_payload()
         enabled, success, msg = logic.mint_preprint_doi(self.preprint)
