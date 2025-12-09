@@ -47,6 +47,13 @@ JOURNAL_XML = \
                 <titles>
                     <title>Test Article from Utils Testing Helpers</title>
                 </titles>
+                <contributors>
+                    <person_name contributor_role="author" sequence="first">
+                        <given_name>Author A</given_name>
+                        <surname>User</surname>
+                        <ORCID>https://orcid.org/1234-5678-9012-345X</ORCID>
+                    </person_name>
+                </contributors>
                 {}
                 <doi_data>
                     <doi>10.9999/TEST</doi>
@@ -109,6 +116,11 @@ BOOK_XML = \
             </book_series_metadata>
             <content_item component_type="chapter" publication_type="full_text" language="en">
                 <contributors>
+                    <person_name contributor_role="author" sequence="first">
+                        <given_name>Author A</given_name>
+                        <surname>User</surname>
+                        <ORCID>https://orcid.org/1234-5678-9012-345X</ORCID>
+                    </person_name>
                 </contributors>
                 <titles>
                     <title>Test Article from Utils Testing Helpers</title>
@@ -183,7 +195,11 @@ class EZIDJournalTest(TestCase):
         self.user = helpers.create_user("user1@test.edu")
         self.press = helpers.create_press()
         self.journal, _ = helpers.create_journals()
-        self.article = helpers.create_article(self.journal, remote_url="https://test.org/qtXXXXXX")
+        self.article = helpers.create_article(
+            self.journal,
+            with_author=True,
+            remote_url="https://test.org/qtXXXXXX"
+        )
         self.license = Licence(name="license_test", short_name="lt", url="https://test.cc.org")
         self.license.save()
         setting_handler.save_setting('Identifiers', 'crossref_name', self.journal, "crossref_test")
@@ -288,7 +304,7 @@ class EZIDJournalTest(TestCase):
 
     def test_disabled(self):
         setting_handler.save_setting('plugin:ezid', 'ezid_plugin_enable', self.article.journal, False)
-        enabled, success, msg = logic.register_journal_doi(self.article)
+        enabled, _success, _msg = logic.register_journal_doi(self.article)
 
         self.assertFalse(enabled)
     
