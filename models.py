@@ -11,4 +11,4 @@ class RepoEZIDSettings(models.Model):
     ezid_endpoint_url = models.URLField(max_length=300)
 
     def __str__(self):
-        return "EZID settings: {}".format(self.repo)
+        return f"EZID settings: {self.repo}"

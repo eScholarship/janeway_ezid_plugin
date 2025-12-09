@@ -42,15 +42,15 @@ def install():
     )
 
     if created:
-        print('Plugin {0} installed.'.format(PLUGIN_NAME))
+        print(f'Plugin {PLUGIN_NAME} installed.')
     elif plugin.version != VERSION:
-        print('Plugin updated: {0} -> {1}'.format(VERSION, plugin.version))
+        print(f'Plugin updated: {VERSION} -> {plugin.version}')
         plugin.version = VERSION
         plugin.display_name = DISPLAY_NAME
         plugin.save()
 
     else:
-        print('Plugin {0} is already installed.'.format(PLUGIN_NAME))
+        print(f'Plugin {PLUGIN_NAME} is already installed.')
 
     update_settings(
         file_path="plugins/ezid/install/settings.json"

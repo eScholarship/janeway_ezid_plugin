@@ -25,18 +25,6 @@ from plugins.ezid.models import RepoEZIDSettings
 
 logger = get_logger(__name__)
 
-def get_valid_orcid(orcid):
-    ''' Determine whether the given input_string is a valid ORCID '''
-    if not orcid:
-        return None
-    if not orcid.startswith('http'):
-        orcid = f'https://orcid.org/{orcid}'
-
-    regex = re.compile('https?://orcid.org/[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[X0-9]{1}$')
-    match = regex.match(str(orcid))
-    return orcid if bool(match) else None
-
-
 def get_license_url(article):
     if article and article.license and article.license.url :
         url = article.license.url
@@ -63,9 +51,8 @@ def normalize_author_metadata(preprint_authors):
                 new_author['surname'] = contributor.first_name
                 logger.info(f'No last_name found for {contributor} using first_name')
 
-            orcid = get_valid_orcid(contributor.orcid)
-            if orcid:
-                new_author['ORCID'] = orcid
+            if contributor.orcid:
+                new_author['ORCID'] = contributor.orcid
             else:
                 logger.warning(f'Invalid ORCID {contributor.orcid} for {contributor} omitted')
 
@@ -245,7 +232,7 @@ def get_journal_metadata(article):
         # build content download url
         download_url = f'https://escholarship.org/content/{itemId}/{itemId}.pdf'
     return {'now': timezone.now(),
-            'target_url': article.remote_url,
+            'target_url': article.remote_url if article.remote_url else article.url,
             'article': article,
             'title': escape_str(article.title),
             'abstract': escape_str(article.abstract),
