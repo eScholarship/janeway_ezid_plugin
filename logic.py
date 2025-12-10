@@ -12,14 +12,13 @@ from urllib.parse import quote
 import urllib.request as urlreq
 
 from django.core.validators import URLValidator, ValidationError
-from django.conf import settings
 from django.utils import timezone
 from django.template.loader import render_to_string
+from django.contrib import messages
+
 from utils.logger import get_logger
 from utils import setting_handler
 from identifiers import logic as id_logic
-
-from django.contrib import messages
 
 from plugins.ezid.models import RepoEZIDSettings
 
@@ -127,7 +126,8 @@ def prepare_payload(ezid_metadata, template, target_url, owner):
     # normalize xml output by collapsing all whitespace to a single space
     _re_combine_whitespace = re.compile(r"\s+")
     metadata = _re_combine_whitespace.sub(" ", render_to_string(template, ezid_metadata)).strip()
-    payload = f"crossref: {metadata}\n_crossref: yes\n_profile: crossref\n_target: {target_url}\n_owner: {owner}"
+    payload = (f"crossref: {metadata}\n_crossref: yes\n"
+               f"_profile: crossref\n_target: {target_url}\n_owner: {owner}")
     return payload
 
 def process_ezid_result(item, action, ezid_result, request):
@@ -144,7 +144,7 @@ def process_ezid_result(item, action, ezid_result, request):
             if request: messages.error(request, msg)
     else:
         logger.error(f'EZID DOI {action} failed for {item}')
-        if ezid_result != None:
+        if ezid_result is not None:
             logger.error(ezid_result.msg)
 
     return None
@@ -199,7 +199,7 @@ def preprint_doi(preprint, action, request):
         if doi:
             preprint.preprint_doi = doi
             preprint.save()
-        return True, (doi != None), ezid_result
+        return True, (doi is not None), ezid_result
     else:
         return False, False, f"EZID not enabled for {preprint.repository}"
 
@@ -224,7 +224,7 @@ def preprint_publication(**kwargs):
     logger.debug('>>> preprint_publication called, mint an EZID DOI...')
     preprint = kwargs.get('preprint')
     request = kwargs.get('request')
-    enabled, success, msg = mint_preprint_doi(preprint, request=request)
+    _enabled, _success, _msg = mint_preprint_doi(preprint, request=request)
 
 def get_setting(prefix, name, journal):
     return setting_handler.get_setting(prefix, name, journal).processed_value
@@ -233,9 +233,9 @@ def get_journal_metadata(article):
     download_url = None
     if article.remote_url:
         # get id from url and add prefix to prepare item id
-        itemId = 'qt'+ article.remote_url[-8:]
+        item_id = 'qt'+ article.remote_url[-8:]
         # build content download url
-        download_url = f'https://escholarship.org/content/{itemId}/{itemId}.pdf'
+        download_url = f'https://escholarship.org/content/{item_id}/{item_id}.pdf'
     return {'now': timezone.now(),
             'target_url': article.remote_url if article.remote_url else article.url,
             'article': article,
@@ -286,7 +286,7 @@ def journal_article_doi(article, action, request):
         payload = prepare_payload(ezid_metadata, template, ezid_metadata["target_url"], owner)
         ezid_result = send_request(method, path, payload, username, password, endpoint_url)
         doi = process_ezid_result(article, action, ezid_result, request)
-        return True, (doi != None), ezid_result
+        return True, (doi is not None), ezid_result
     else:
         msg = f"EZID not enabled for {article.journal}"
         if request: messages.warning(request, msg)
@@ -302,4 +302,4 @@ def assign_article_doi(**kwargs):
     article = kwargs.get('article')
     if get_setting('plugin:ezid', 'ezid_plugin_enable', article.journal):
         if not article.get_doi():
-            id = id_logic.generate_crossref_doi_with_pattern(article)
+            _id = id_logic.generate_crossref_doi_with_pattern(article)

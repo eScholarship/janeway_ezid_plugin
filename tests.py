@@ -29,7 +29,7 @@ JOURNAL_XML = \
            xsi:schemaLocation="http://www.crossref.org/schema/5.3.1
                                http://www.crossref.org/schemas/crossref5.3.1.xsd">
     <head>
-        <doi_batch_id>JournalOne_20230101_{}</doi_batch_id>
+        <doi_batch_id>JournalOne_20230101_{article_id}</doi_batch_id>
         <timestamp>1672531200</timestamp>
         <depositor>
             <depositor_name>crossref_test</depositor_name>
@@ -55,11 +55,11 @@ JOURNAL_XML = \
                         <ORCID>https://orcid.org/1234-5678-9012-345X</ORCID>
                     </person_name>
                 </contributors>
-                {}
+                {license_xml}
                 <doi_data>
                     <doi>10.9999/TEST</doi>
-                    <resource>{}</resource>
-                    {}
+                    <resource>{target_url}</resource>
+                    {download_xml}
                 </doi_data>
             </journal_article>
         </journal>
@@ -67,7 +67,7 @@ JOURNAL_XML = \
 </doi_batch>
 """
 
-DOWNLOAD_URL = \
+DOWNLOAD_XML = \
 """
 <collection property="text-mining">
     <item>
@@ -87,7 +87,7 @@ BOOK_XML = \
            xsi:schemaLocation="http://www.crossref.org/schema/5.3.1
                                http://www.crossref.org/schemas/crossref5.3.1.xsd">
     <head>
-        <doi_batch_id>JournalOne_20230101_{}</doi_batch_id>
+        <doi_batch_id>JournalOne_20230101_{article_id}</doi_batch_id>
         <timestamp>1672531200</timestamp>
         <depositor>
             <depositor_name>crossref_test</depositor_name>
@@ -132,11 +132,11 @@ BOOK_XML = \
                     <day></day>
                     <year></year>
                 </publication_date>
-                {}
+                {license_xml}
                 <doi_data>
                     <doi>10.9999/TEST</doi>
-                    <resource>{}</resource>
-                    {}
+                    <resource>{target_url}</resource>
+                    {download_xml}
                 </doi_data>
             </content_item>
         </book>
@@ -270,11 +270,20 @@ class EZIDJournalTest(TestCase):
     def strip_payload(self, s):
         return re.compile(r"\s+").sub(" ", s).strip()
 
-    def get_payload(self, xml, target_url="https://test.org/qtXXXXXX", owner="crossref_registrant", license_xml="", download=True):
-        dxml = DOWNLOAD_URL if download else ""
-        return PAYLOAD.format(self.strip_payload(xml.format(self.article.pk, license_xml, target_url, dxml)),
-                              target_url,
-                              owner)
+    def get_payload(self, xml_tmpl, **kwargs):
+        target_url = kwargs.pop("target_url", "https://test.org/qtXXXXXX")
+        owner = kwargs.pop("owner", "crossref_registrant")
+        args = {
+            "article_id": self.article.pk,
+            "license_xml": kwargs.pop("license_xml", ""),
+            "target_url": target_url, 
+            "download_xml": kwargs.pop("download_xml", DOWNLOAD_XML),           
+        }
+        return PAYLOAD.format(
+            self.strip_payload(xml_tmpl.format(**args)),
+            target_url,
+            owner
+        )
 
     @freeze_time(FROZEN_DATETIME)
     @mock.patch('plugins.ezid.logic.send_request',
@@ -423,7 +432,7 @@ class EZIDJournalTest(TestCase):
         payload = self.get_payload(
             JOURNAL_XML,
             target_url=self.article.url,
-            download=False
+            download_xml=""
         )
 
         enabled, success, msg = logic.update_journal_doi(self.article)
