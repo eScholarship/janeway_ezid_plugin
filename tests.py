@@ -1,3 +1,6 @@
+"""
+EZID plugin tests module
+"""
 import re
 from datetime import datetime
 from freezegun import freeze_time
@@ -198,6 +201,7 @@ EZID_ENDPOINT_URL = 'https://test.org/'
 EZID_PASSWORD = 'password'
 
 class EZIDJournalTest(TestCase):
+    """Test EZID DOI registration for journal articles"""
     def setUp(self):
         call_command('install_plugins', 'ezid')
         self.user = helpers.create_user("user1@test.edu")
@@ -503,6 +507,7 @@ class EZIDJournalTest(TestCase):
 
 
 class EZIDPreprintTest(TestCase):
+    """Test EZID DOI registration for preprints"""
     def setUp(self):
         self.user = helpers.create_user(
             "user1@test.edu",

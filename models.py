@@ -1,8 +1,13 @@
+"""
+EZID plugin models module
+"""
+
 from django.db import models
 
 from repository.models import Repository
 
 class RepoEZIDSettings(models.Model):
+    """EZID settings for a repsitory"""
     repo = models.OneToOneField(Repository, on_delete=models.CASCADE)
     ezid_shoulder = models.CharField(max_length=50)
     ezid_owner = models.CharField(max_length=50)

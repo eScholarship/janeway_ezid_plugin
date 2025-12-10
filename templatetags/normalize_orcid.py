@@ -1,3 +1,6 @@
+"""
+EZID plugin template tag to normalize ORCID identifiers
+"""
 import re
 from django import template
 

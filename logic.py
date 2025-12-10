@@ -38,9 +38,9 @@ def normalize_author_metadata(preprint_authors):
         new_author = {}
         contributor = author.account
         if contributor is None:
-            logger.warn('No preprint author account found')
+            logger.warning('No preprint author account found')
         elif not contributor.first_name and not contributor.last_name:
-            logger.warn('No names given for preprint author')
+            logger.warning('No names given for preprint author')
         else:
             if contributor.last_name:
                 new_author['given_name'] = contributor.first_name
@@ -96,7 +96,9 @@ class EzidHTTPErrorProcessor(urlreq.HTTPErrorProcessor):
         return my_return
     https_response = http_response
 
-def send_request(method, path, data, username, password, endpoint_url):
+# Send request should be refactored to reduce the number of arguments
+# But I'm concentrating on simpler refactoring for now
+def send_request(method, path, data, username, password, endpoint_url): # pylint: disable=too-many-arguments,too-many-positional-arguments
     ''' sends a request to EZID '''
     request_url = f"{endpoint_url}/{path}"
 
@@ -132,16 +134,18 @@ def prepare_payload(ezid_metadata, template, target_url, owner):
 
 def process_ezid_result(item, action, ezid_result, request):
     if isinstance(ezid_result, str):
-        if ezid_result.startswith('success:'):
+        if ezid_result.startswith('success:'): # pylint: disable=no-else-return
             doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
             msg = f'DOI {action} success: {doi}'
             logger.debug(msg)
-            if request: messages.success(request, msg)
+            if request:
+                messages.success(request, msg)
             return doi
         else:
             msg = f'EZID DOI {action} failed for {item}: {ezid_result}'
             logger.error(msg)
-            if request: messages.error(request, msg)
+            if request:
+                messages.error(request, msg)
     else:
         logger.error(f'EZID DOI {action} failed for {item}')
         if ezid_result is not None:
@@ -200,24 +204,21 @@ def preprint_doi(preprint, action, request):
             preprint.preprint_doi = doi
             preprint.save()
         return True, (doi is not None), ezid_result
-    else:
-        return False, False, f"EZID not enabled for {preprint.repository}"
+    return False, False, f"EZID not enabled for {preprint.repository}"
 
 def update_preprint_doi(preprint, request=None):
     if not preprint.preprint_doi:
         msg = f'{preprint} does not have a DOI'
         logger.info(msg)
         return True, False, msg
-    else:
-        return preprint_doi(preprint, "update", request)
+    return preprint_doi(preprint, "update", request)
 
 def mint_preprint_doi(preprint, request=None):
     if preprint.preprint_doi:
         msg = f'{preprint} already has a DOI: {preprint.preprint_doi}'
         logger.info(msg)
         return True, False, msg
-    else:
-        return preprint_doi(preprint, "mint", request)
+    return preprint_doi(preprint, "mint", request)
 
 def preprint_publication(**kwargs):
     ''' hook script for the preprint_publication event '''
@@ -253,16 +254,18 @@ def get_journal_template(journal):
     return 'ezid/book_chapter.xml' if is_book_chapter else 'ezid/journal_content.xml'
 
 def journal_article_doi(article, action, request):
-    if get_setting('plugin:ezid', 'ezid_plugin_enable', article.journal):
+    if get_setting('plugin:ezid', 'ezid_plugin_enable', article.journal): # pylint: disable=no-else-return
         if not is_valid_issn(article.journal.issn) and not is_valid_url(article.journal.issn):
             msg = f"Invalid ISSN {article.journal.issn} for {article.journal}"
-            if request: messages.error(request, msg)
+            if request:
+                messages.error(request, msg)
             return True, False, msg
 
         ezid_metadata = get_journal_metadata(article)
         if not ezid_metadata["doi"] and action != "mint":
             msg = f"{article} not assigned a DOI"
-            if request: messages.error(request, msg)
+            if request:
+                messages.error(request, msg)
             return True, False, msg
         template = get_journal_template(article.journal)
 
@@ -279,7 +282,8 @@ def journal_article_doi(article, action, request):
 
         if not username or not password or not endpoint_url or not owner:
             msg = f"EZID not fully configured for {article.journal}"
-            if request: messages.error(request, msg)
+            if request:
+                messages.error(request, msg)
             return True, False, msg
 
         path = f'id/doi:{encode(ezid_metadata["doi"])}'
@@ -289,7 +293,8 @@ def journal_article_doi(article, action, request):
         return True, (doi is not None), ezid_result
     else:
         msg = f"EZID not enabled for {article.journal}"
-        if request: messages.warning(request, msg)
+        if request:
+            messages.warning(request, msg)
         return False, False, msg
 
 def update_journal_doi(article, request=None):

@@ -1,14 +1,10 @@
+"""
+EZID plugin views module (currently placeholder)
+"""
 from django.shortcuts import render
-
-from plugins.ezid import forms
 
 
 def ezid_manager(request):
-    form = forms.DummyManagerForm()
-
     template = 'ezid/manager.html'
-    context = {
-        'form': form,
-    }
-
+    context = {}
     return render(request, template, context)
