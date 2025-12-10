@@ -1,7 +1,7 @@
-import mock
 import re
 from datetime import datetime
 from freezegun import freeze_time
+import mock
 
 from django.test import TestCase
 from django.core.management import call_command
@@ -15,7 +15,7 @@ from submission.models import Licence
 from utils.testing import helpers
 from utils import setting_handler, logger
 
-import plugins.ezid.logic as logic
+from plugins.ezid import logic
 from plugins.ezid.models import RepoEZIDSettings
 
 FROZEN_DATETIME = timezone.make_aware(timezone.datetime(2023, 1, 1, 0, 0, 0))
@@ -26,7 +26,8 @@ JOURNAL_XML = \
 <doi_batch xmlns="http://www.crossref.org/schema/5.3.1"
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            version="5.3.1"
-           xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
+           xsi:schemaLocation="http://www.crossref.org/schema/5.3.1
+                               http://www.crossref.org/schemas/crossref5.3.1.xsd">
     <head>
         <doi_batch_id>JournalOne_20230101_{}</doi_batch_id>
         <timestamp>1672531200</timestamp>
@@ -83,7 +84,8 @@ BOOK_XML = \
 <doi_batch xmlns="http://www.crossref.org/schema/5.3.1"
            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            version="5.3.1"
-           xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
+           xsi:schemaLocation="http://www.crossref.org/schema/5.3.1
+                               http://www.crossref.org/schemas/crossref5.3.1.xsd">
     <head>
         <doi_batch_id>JournalOne_20230101_{}</doi_batch_id>
         <timestamp>1672531200</timestamp>
@@ -191,6 +193,9 @@ PREPRINT_XML = """
 PAYLOAD = 'crossref: {}\n_crossref: yes\n_profile: crossref\n_target: {}\n_owner: {}'
 
 EZID_PATH = 'id/doi:10.9999/TEST'
+EZID_USERNAME = 'username'
+EZID_ENDPOINT_URL = 'https://test.org/'
+EZID_PASSWORD = 'password'
 
 class EZIDJournalTest(TestCase):
     def setUp(self):
@@ -205,22 +210,29 @@ class EZIDJournalTest(TestCase):
         )
         self.license = Licence(name="license_test", short_name="lt", url="https://test.cc.org")
         self.license.save()
-        setting_handler.save_setting('Identifiers', 'crossref_name', self.journal, "crossref_test")
-        setting_handler.save_setting('Identifiers', 'crossref_email', self.journal, "user1@test.edu")
-        setting_handler.save_setting('Identifiers', 'crossref_registrant', self.journal, "crossref_registrant")
-        setting_handler.save_setting('plugin:ezid', 'ezid_plugin_endpoint_url', self.journal, "https://test.org/")
-        setting_handler.save_setting('plugin:ezid', 'ezid_plugin_username', self.journal, "username")
-        setting_handler.save_setting('plugin:ezid', 'ezid_plugin_password', self.journal, "password")
-
-        self.username = logic.get_setting('ezid_plugin_username', self.article.journal)
-        self.password = logic.get_setting('ezid_plugin_password', self.article.journal)
-        self.endpoint_url = logic.get_setting('ezid_plugin_endpoint_url', self.article.journal)
+        isettings = {"crossref_name": "crossref_test",
+                     "crossref_email": "user1@test.edu",
+                     "crossref_registrant": "crossref_registrant"}
+        self.save_settings('Identifiers', self.journal, isettings)
+        esettings = {
+            "ezid_plugin_endpoint_url": "https://test.org/",
+            "ezid_plugin_username":  "username",
+            "ezid_plugin_password": "password"
+        }
+        self.save_settings('plugin:ezid', self.journal, esettings)
 
         setting_handler.save_setting('general', 'journal_issn', self.article.journal, "1111-1111")
         # if we don't clear the cache we get the old, invalid ISSN
         cache.clear()
-        _doi = Identifier.objects.create(id_type="doi", identifier="10.9999/TEST", article=self.article)
+        _doi = Identifier.objects.create(
+            id_type="doi",
+            identifier="10.9999/TEST",
+            article=self.article
+        )
 
+    def save_settings(self, prefix, journal, settings_dict):
+        for key, value in settings_dict.items():
+            setting_handler.save_setting(prefix, key, journal, value)
 
     def test_journal_metadata(self):
         metadata = logic.get_journal_metadata(self.article)
@@ -256,35 +268,51 @@ class EZIDJournalTest(TestCase):
         self.assertNotIn("abstract", cref_xml)
 
     def strip_payload(self, s):
-        _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
-        return _RE_COMBINE_WHITESPACE.sub(" ", s).strip()
+        return re.compile(r"\s+").sub(" ", s).strip()
 
     def get_payload(self, xml, target_url="https://test.org/qtXXXXXX", owner="crossref_registrant", license_xml="", download=True):
         dxml = DOWNLOAD_URL if download else ""
         return PAYLOAD.format(self.strip_payload(xml.format(self.article.pk, license_xml, target_url, dxml)),
-                              target_url, owner)
-    
+                              target_url,
+                              owner)
+
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_register_doi(self, mock_send):
         payload = self.get_payload(JOURNAL_XML)
 
         enabled, success, msg = logic.register_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("PUT", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
+        mock_send.assert_called_once_with(
+            "PUT",
+            EZID_PATH,
+            payload,
+            EZID_USERNAME,
+            EZID_PASSWORD,
+            EZID_ENDPOINT_URL
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
         self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
 
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_update_doi(self, mock_send):
         payload = self.get_payload(JOURNAL_XML)
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
+        mock_send.assert_called_once_with(
+            "POST",
+            EZID_PATH,
+            payload,
+            EZID_USERNAME,
+            EZID_PASSWORD,
+            EZID_ENDPOINT_URL
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -297,16 +325,24 @@ class EZIDJournalTest(TestCase):
 
         self.assertTrue(enabled)
         self.assertFalse(success)
-        self.assertEqual(msg, f"Invalid ISSN {self.article.journal.issn} for {self.article.journal}")
+        self.assertEqual(
+            msg,
+            f"Invalid ISSN {self.article.journal.issn} for {self.article.journal}"
+        )
 
     def test_disabled(self):
-        setting_handler.save_setting('plugin:ezid', 'ezid_plugin_enable', self.article.journal, False)
+        setting_handler.save_setting(
+            'plugin:ezid',
+            'ezid_plugin_enable',
+            self.article.journal, False
+        )
         enabled, _success, _msg = logic.register_journal_doi(self.article)
 
         self.assertFalse(enabled)
-    
+
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_register_bookchapter_doi(self, mock_send):
         setting_handler.save_setting('plugin:ezid', 'ezid_book_chapter', self.journal, "1")
         cache.clear()
@@ -314,7 +350,14 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.register_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("PUT", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
+        mock_send.assert_called_once_with(
+            "PUT",
+            EZID_PATH,
+            payload,
+            EZID_USERNAME,
+            EZID_PASSWORD,
+            EZID_ENDPOINT_URL
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -322,7 +365,8 @@ class EZIDJournalTest(TestCase):
 
 
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_update_bookchapter_doi(self, mock_send):
         setting_handler.save_setting('plugin:ezid', 'ezid_book_chapter', self.journal, "1")
         cache.clear()
@@ -330,14 +374,22 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
+        mock_send.assert_called_once_with(
+            "POST",
+            EZID_PATH,
+            payload,
+            EZID_USERNAME,
+            EZID_PASSWORD,
+            EZID_ENDPOINT_URL
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
         self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
 
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_with_license_doi(self, mock_send):
         self.article.license = self.license
         self.article.save()
@@ -348,7 +400,14 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
+        mock_send.assert_called_once_with(
+            "POST",
+            EZID_PATH,
+            payload,
+            EZID_USERNAME,
+            EZID_PASSWORD,
+            EZID_ENDPOINT_URL
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -356,15 +415,27 @@ class EZIDJournalTest(TestCase):
 
     # test without remote url
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_without_remoteurl_doi(self, mock_send):
         self.article.remote_url = None
         self.article.save()
-        payload = self.get_payload(JOURNAL_XML, target_url=self.article.url, download=False)
+        payload = self.get_payload(
+            JOURNAL_XML,
+            target_url=self.article.url,
+            download=False
+        )
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
+        mock_send.assert_called_once_with(
+            "POST",
+            EZID_PATH,
+            payload,
+            EZID_USERNAME,
+            EZID_PASSWORD,
+            EZID_ENDPOINT_URL
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -372,7 +443,8 @@ class EZIDJournalTest(TestCase):
 
 
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_with_empty_license_doi(self, mock_send):
         self.license.url = '  '
         self.license.save()
@@ -382,14 +454,22 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
+        mock_send.assert_called_once_with(
+            "POST",
+            EZID_PATH,
+            payload,
+            EZID_USERNAME,
+            EZID_PASSWORD,
+            EZID_ENDPOINT_URL
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
         self.assertEqual(msg, "success: doi:10.9999/TEST | ark:/b9999/test")
 
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_orcid_url(self, mock_send):
         author = self.article.authors.all()[0]
         author.orcid = "https://orcid.org/1234-5678-9012-345X"
@@ -399,7 +479,14 @@ class EZIDJournalTest(TestCase):
 
         enabled, success, msg = logic.update_journal_doi(self.article)
 
-        mock_send.assert_called_once_with("POST", EZID_PATH, payload, self.username, self.password, self.endpoint_url)
+        mock_send.assert_called_once_with(
+            "POST",
+            EZID_PATH,
+            payload,
+            EZID_USERNAME,
+            EZID_PASSWORD,
+            EZID_ENDPOINT_URL
+        )
 
         self.assertTrue(enabled)
         self.assertTrue(success)
@@ -408,28 +495,44 @@ class EZIDJournalTest(TestCase):
 
 class EZIDPreprintTest(TestCase):
     def setUp(self):
-        self.user = helpers.create_user("user1@test.edu", first_name="User", last_name="One", orcid="0000-0001-2345-6789")
+        self.user = helpers.create_user(
+            "user1@test.edu",
+            first_name="User",
+            last_name="One",
+            orcid="0000-0001-2345-6789"
+        )
         self.press = helpers.create_press()
-        self.repo, self.subject = helpers.create_repository(self.press, [self.user], [self.user])
+        self.repo, self.subject = helpers.create_repository(
+            self.press,
+            [self.user],
+            [self.user]
+        )
         self.preprint = helpers.create_preprint(self.repo, self.user, self.subject)
         PreprintVersion.objects.create(preprint=self.preprint,
                                        version=1,
                                        file=self.preprint.submission_file)
         self.preprint.save()
-        self.settings = RepoEZIDSettings.objects.create(repo=self.repo,
-                                                        ezid_shoulder="shoulder",
-                                                        ezid_owner="owner",
-                                                        ezid_username="username",
-                                                        ezid_password="password",
-                                                        ezid_endpoint_url="endpoint.org")
+        self.settings = RepoEZIDSettings.objects.create(
+            repo=self.repo,
+            ezid_shoulder="shoulder",
+            ezid_owner="owner",
+            ezid_username="username",
+            ezid_password="password",
+            ezid_endpoint_url="endpoint.org"
+        )
 
     def strip_payload(self, s):
-        _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
-        return _RE_COMBINE_WHITESPACE.sub(" ", s).strip()
+        return re.compile(r"\s+").sub(" ", s).strip()
 
     def get_payload(self, owner="owner"):
-        return PAYLOAD.format(self.strip_payload(PREPRINT_XML.format(self.preprint.current_version.file.download_url())),
-                                 self.preprint.url, owner)
+        xml = PREPRINT_XML.format(
+            self.preprint.current_version.file.download_url()
+        )
+        return PAYLOAD.format(
+            self.strip_payload(xml),
+            self.preprint.url,
+            owner
+        )
 
     def test_preprint_metadata(self):
         metadata = logic.get_preprint_metadata(self.preprint)
@@ -474,7 +577,8 @@ class EZIDPreprintTest(TestCase):
         self.assertFalse("published_doi" in metadata)
         self.assertEqual(metadata["group_title"], self.subject.name)
         self.assertEqual(len(metadata["contributors"]), 1)
-        error_mock.assert_called_once_with(f'{self.preprint} has an invalid Published DOI: {self.preprint.doi}')
+        log_msg = f'{self.preprint} has an invalid Published DOI: {self.preprint.doi}'
+        error_mock.assert_called_once_with(log_msg)
 
     def test_preprint_template(self):
         metadata = logic.get_preprint_metadata(self.preprint)
@@ -518,7 +622,8 @@ class EZIDPreprintTest(TestCase):
         self.assertFalse(enabled)
 
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_preprint_update(self, mock_send):
         self.preprint.preprint_doi = "10.9999/TEST"
         path = "id/doi:10.9999/TEST"
@@ -541,7 +646,8 @@ class EZIDPreprintTest(TestCase):
         self.assertEqual(self.preprint.preprint_doi, "10.9999/TEST")
 
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_preprint_mint(self, mock_send):
         path = "shoulder/shoulder"
         payload = self.get_payload()
@@ -562,7 +668,8 @@ class EZIDPreprintTest(TestCase):
         self.assertEqual(self.preprint.preprint_doi, "10.9999/TEST")
 
     @freeze_time(FROZEN_DATETIME)
-    @mock.patch('plugins.ezid.logic.send_request', return_value="success: doi:10.9999/TEST | ark:/b9999/test")
+    @mock.patch('plugins.ezid.logic.send_request',
+                return_value="success: doi:10.9999/TEST | ark:/b9999/test")
     def test_preprint_orcid_url(self, mock_send):
         self.user.orcid = "https://orcid.org/0000-0001-2345-6789"
         self.user.save()

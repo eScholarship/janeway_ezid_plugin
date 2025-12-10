@@ -34,10 +34,9 @@ def get_license_url(article):
 
 def normalize_author_metadata(preprint_authors):
     ''' returns a list of authors in dictionary format using a list of author objects '''
-    #example: {"given_name": "Hardy", "surname": "Pottinger", "ORCID": "https://orcid.org/0000-0001-8549-9354"},
     author_list = []
     for author in preprint_authors:
-        new_author = dict()
+        new_author = {}
         contributor = author.account
         if contributor is None:
             logger.warn('No preprint author account found')
@@ -126,8 +125,8 @@ def send_request(method, path, data, username, password, endpoint_url):
 
 def prepare_payload(ezid_metadata, template, target_url, owner):
     # normalize xml output by collapsing all whitespace to a single space
-    _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
-    metadata = _RE_COMBINE_WHITESPACE.sub(" ", render_to_string(template, ezid_metadata)).strip()
+    _re_combine_whitespace = re.compile(r"\s+")
+    metadata = _re_combine_whitespace.sub(" ", render_to_string(template, ezid_metadata)).strip()
     payload = f"crossref: {metadata}\n_crossref: yes\n_profile: crossref\n_target: {target_url}\n_owner: {owner}"
     return payload
 
@@ -151,6 +150,8 @@ def process_ezid_result(item, action, ezid_result, request):
     return None
 
 def get_preprint_metadata(preprint):
+    version = preprint.current_version
+    download_url = version.file.download_url if version.file else None
     ezid_metadata = {'now': timezone.now(),
                      'target_url': preprint.url,
                      'group_title': preprint.subject.values_list()[0][2],
@@ -161,7 +162,7 @@ def get_preprint_metadata(preprint):
                      'abstract': escape_str(preprint.abstract),
                      'license_url': get_license_url(preprint),
                      'site_url': preprint.repository.site_url,
-                     'download_url': preprint.current_version.file.download_url if preprint.current_version.file else None}
+                     'download_url': download_url}
 
     if preprint.doi:
         if is_valid_url(preprint.doi):
@@ -182,7 +183,11 @@ def preprint_doi(preprint, action, request):
         endpoint_url = ezid_settings.ezid_endpoint_url
         owner = ezid_settings.ezid_owner
 
-        payload = prepare_payload(ezid_metadata, 'ezid/posted_content.xml', ezid_metadata['target_url'], owner)
+        payload = prepare_payload(
+            ezid_metadata,
+            'ezid/posted_content.xml',
+            ezid_metadata['target_url'], owner
+        )
 
         if action == "update":
             path = f'id/doi:{encode(preprint.preprint_doi)}'
@@ -221,8 +226,8 @@ def preprint_publication(**kwargs):
     request = kwargs.get('request')
     enabled, success, msg = mint_preprint_doi(preprint, request=request)
 
-def get_setting(name, journal):
-    return setting_handler.get_setting('plugin:ezid', name, journal).processed_value
+def get_setting(prefix, name, journal):
+    return setting_handler.get_setting(prefix, name, journal).processed_value
 
 def get_journal_metadata(article):
     download_url = None
@@ -237,17 +242,18 @@ def get_journal_metadata(article):
             'title': escape_str(article.title),
             'abstract': escape_str(article.abstract),
             'doi': article.get_doi(),
-            'depositor_name': setting_handler.get_setting('Identifiers', 'crossref_name', article.journal).processed_value,
-            'depositor_email': setting_handler.get_setting('Identifiers', 'crossref_email', article.journal).processed_value,
-            'registrant': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,
+            'depositor_name': get_setting('Identifiers', 'crossref_name', article.journal),
+            'depositor_email': get_setting('Identifiers', 'crossref_email', article.journal),
+            'registrant': get_setting('Identifiers', 'crossref_registrant', article.journal),
             'download_url': download_url,
             'license_url': get_license_url(article)}
 
 def get_journal_template(journal):
-    return 'ezid/book_chapter.xml' if get_setting('ezid_book_chapter', journal) else 'ezid/journal_content.xml'
+    is_book_chapter = get_setting('plugin:ezid', 'ezid_book_chapter', journal)
+    return 'ezid/book_chapter.xml' if is_book_chapter else 'ezid/journal_content.xml'
 
 def journal_article_doi(article, action, request):
-    if get_setting('ezid_plugin_enable', article.journal):
+    if get_setting('plugin:ezid', 'ezid_plugin_enable', article.journal):
         if not is_valid_issn(article.journal.issn) and not is_valid_url(article.journal.issn):
             msg = f"Invalid ISSN {article.journal.issn} for {article.journal}"
             if request: messages.error(request, msg)
@@ -266,10 +272,10 @@ def journal_article_doi(article, action, request):
         else:
             method = "PUT"
 
-        username = get_setting('ezid_plugin_username', article.journal)
-        password = get_setting('ezid_plugin_password', article.journal)
-        endpoint_url = get_setting('ezid_plugin_endpoint_url', article.journal)
-        owner = setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value
+        username = get_setting('plugin:ezid', 'ezid_plugin_username', article.journal)
+        password = get_setting('plugin:ezid', 'ezid_plugin_password', article.journal)
+        endpoint_url = get_setting('plugin:ezid', 'ezid_plugin_endpoint_url', article.journal)
+        owner = get_setting('Identifiers', 'crossref_registrant', article.journal)
 
         if not username or not password or not endpoint_url or not owner:
             msg = f"EZID not fully configured for {article.journal}"
@@ -294,6 +300,6 @@ def register_journal_doi(article, request=None):
 
 def assign_article_doi(**kwargs):
     article = kwargs.get('article')
-    if get_setting('ezid_plugin_enable', article.journal):
+    if get_setting('plugin:ezid', 'ezid_plugin_enable', article.journal):
         if not article.get_doi():
             id = id_logic.generate_crossref_doi_with_pattern(article)

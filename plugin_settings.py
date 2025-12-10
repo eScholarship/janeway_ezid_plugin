@@ -56,12 +56,6 @@ def install():
         file_path="plugins/ezid/install/settings.json"
     )
 
-
-def register_for_events():
-    '''register for events '''
-    #TODO: add events we need to listen for here
-    pass
-
 def hook_registry():
     ''' connect a hook with a method in this plugin's logic '''
     logger.debug('hook_registry called for ezid plugin')
@@ -69,4 +63,3 @@ def hook_registry():
                                           logic.preprint_publication)
     event_logic.Events.register_for_event(event_logic.Events.ON_ARTICLE_ACCEPTED,
                                           logic.assign_article_doi)
-
