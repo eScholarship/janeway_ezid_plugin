@@ -1,0 +1,40 @@
+name: Pylint
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    steps:
+    - name: Checkout Janeway
+      uses: actions/checkout@v4
+      with:
+        repository: eScholarship/janeway
+        ref: 'cdl-current-version'
+    - name: Checkout EZID Plugin
+      uses: actions/checkout@v4
+      with:
+        path: src/plugins/ezid/
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint
+        pip install pylint_django
+        pip install -r requirements.txt
+        pip install django_q
+    - name: Analysing the code with pylint
+      env:
+        PYTHONPATH: ./src/
+      run: |
+        pylint --load-plugins pylint_django --django-settings-module=core.settings --disable=missing-function-docstring --ignore=migrations src/plugins/ezid/
