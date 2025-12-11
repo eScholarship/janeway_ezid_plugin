@@ -37,4 +37,4 @@ jobs:
       env:
         PYTHONPATH: ./src/
       run: |
-        pylint --load-plugins pylint_django --django-settings-module=core.settings --disable=missing-function-docstring --ignore=migrations src/plugins/ezid/
+        pylint --load-plugins pylint_django --django-settings-module=core.dev_settings --disable=missing-function-docstring --ignore=migrations src/plugins/ezid/
