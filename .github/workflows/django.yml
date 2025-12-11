@@ -1,0 +1,64 @@
+name: Django CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test_password!
+          MYSQL_DATABASE: janeway
+          MYSQL_USER: mysql
+          MYSQL_PASSWORD: test_password!
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+    - name: Checkout Janeway
+      uses: actions/checkout@v4
+      with:
+        repository: eScholarship/janeway
+        ref: 'cdl-current-version'
+    - name: Checkout Eschol Plugin
+      uses: actions/checkout@v4
+      with:
+        path: src/plugins/ezid/
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.11
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install django_q
+        pip install mysqlclient
+    - name: Install xmllint
+      run: sudo apt-get install -y libxml2-utils
+    - name: Run Tests
+      working-directory: ./src
+      env:
+        DB: mysql
+        DB_HOST: 127.0.0.1
+        DB_PORT: 3306
+        DB_PASSWORD: test_password!
+        DB_VENDOR: mysql
+        DB_NAME: janeway
+        DB_USER: root
+        JANEWAY_SETTINGS_MODULE: core.dev_settings
+      run: |
+        python manage.py install_janeway --use-defaults
+        python manage.py test ezid
