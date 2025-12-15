@@ -1,3 +1,6 @@
+"""
+EZID plugin urls module (not sure this is necessary now but perhaps for future use)
+"""
 from django.urls import re_path
 
 from plugins.ezid import views

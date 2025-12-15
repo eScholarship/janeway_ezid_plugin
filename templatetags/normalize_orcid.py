@@ -1,5 +1,8 @@
-from django import template
+"""
+EZID plugin template tag to normalize ORCID identifiers
+"""
 import re
+from django import template
 
 register = template.Library()
 

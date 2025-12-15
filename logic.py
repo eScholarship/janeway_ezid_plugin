@@ -12,14 +12,13 @@ from urllib.parse import quote
 import urllib.request as urlreq
 
 from django.core.validators import URLValidator, ValidationError
-from django.conf import settings
 from django.utils import timezone
 from django.template.loader import render_to_string
+from django.contrib import messages
+
 from utils.logger import get_logger
 from utils import setting_handler
 from identifiers import logic as id_logic
-
-from django.contrib import messages
 
 from plugins.ezid.models import RepoEZIDSettings
 
@@ -34,15 +33,14 @@ def get_license_url(article):
 
 def normalize_author_metadata(preprint_authors):
     ''' returns a list of authors in dictionary format using a list of author objects '''
-    #example: {"given_name": "Hardy", "surname": "Pottinger", "ORCID": "https://orcid.org/0000-0001-8549-9354"},
     author_list = []
     for author in preprint_authors:
-        new_author = dict()
+        new_author = {}
         contributor = author.account
         if contributor is None:
-            logger.warn('No preprint author account found')
+            logger.warning('No preprint author account found')
         elif not contributor.first_name and not contributor.last_name:
-            logger.warn('No names given for preprint author')
+            logger.warning('No names given for preprint author')
         else:
             if contributor.last_name:
                 new_author['given_name'] = contributor.first_name
@@ -98,7 +96,9 @@ class EzidHTTPErrorProcessor(urlreq.HTTPErrorProcessor):
         return my_return
     https_response = http_response
 
-def send_request(method, path, data, username, password, endpoint_url):
+# Send request should be refactored to reduce the number of arguments
+# But I'm concentrating on simpler refactoring for now
+def send_request(method, path, data, username, password, endpoint_url): # pylint: disable=too-many-arguments,too-many-positional-arguments
     ''' sends a request to EZID '''
     request_url = f"{endpoint_url}/{path}"
 
@@ -126,31 +126,36 @@ def send_request(method, path, data, username, password, endpoint_url):
 
 def prepare_payload(ezid_metadata, template, target_url, owner):
     # normalize xml output by collapsing all whitespace to a single space
-    _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
-    metadata = _RE_COMBINE_WHITESPACE.sub(" ", render_to_string(template, ezid_metadata)).strip()
-    payload = f"crossref: {metadata}\n_crossref: yes\n_profile: crossref\n_target: {target_url}\n_owner: {owner}"
+    _re_combine_whitespace = re.compile(r"\s+")
+    metadata = _re_combine_whitespace.sub(" ", render_to_string(template, ezid_metadata)).strip()
+    payload = (f"crossref: {metadata}\n_crossref: yes\n"
+               f"_profile: crossref\n_target: {target_url}\n_owner: {owner}")
     return payload
 
 def process_ezid_result(item, action, ezid_result, request):
     if isinstance(ezid_result, str):
-        if ezid_result.startswith('success:'):
+        if ezid_result.startswith('success:'): # pylint: disable=no-else-return
             doi = re.search("doi:([0-9A-Z./]+)", ezid_result).group(1)
             msg = f'DOI {action} success: {doi}'
             logger.debug(msg)
-            if request: messages.success(request, msg)
+            if request:
+                messages.success(request, msg)
             return doi
         else:
             msg = f'EZID DOI {action} failed for {item}: {ezid_result}'
             logger.error(msg)
-            if request: messages.error(request, msg)
+            if request:
+                messages.error(request, msg)
     else:
         logger.error(f'EZID DOI {action} failed for {item}')
-        if ezid_result != None:
+        if ezid_result is not None:
             logger.error(ezid_result.msg)
 
     return None
 
 def get_preprint_metadata(preprint):
+    version = preprint.current_version
+    download_url = version.file.download_url if version.file else None
     ezid_metadata = {'now': timezone.now(),
                      'target_url': preprint.url,
                      'group_title': preprint.subject.values_list()[0][2],
@@ -161,7 +166,7 @@ def get_preprint_metadata(preprint):
                      'abstract': escape_str(preprint.abstract),
                      'license_url': get_license_url(preprint),
                      'site_url': preprint.repository.site_url,
-                     'download_url': preprint.current_version.file.download_url if preprint.current_version.file else None}
+                     'download_url': download_url}
 
     if preprint.doi:
         if is_valid_url(preprint.doi):
@@ -182,7 +187,11 @@ def preprint_doi(preprint, action, request):
         endpoint_url = ezid_settings.ezid_endpoint_url
         owner = ezid_settings.ezid_owner
 
-        payload = prepare_payload(ezid_metadata, 'ezid/posted_content.xml', ezid_metadata['target_url'], owner)
+        payload = prepare_payload(
+            ezid_metadata,
+            'ezid/posted_content.xml',
+            ezid_metadata['target_url'], owner
+        )
 
         if action == "update":
             path = f'id/doi:{encode(preprint.preprint_doi)}'
@@ -194,69 +203,69 @@ def preprint_doi(preprint, action, request):
         if doi:
             preprint.preprint_doi = doi
             preprint.save()
-        return True, (doi != None), ezid_result
-    else:
-        return False, False, f"EZID not enabled for {preprint.repository}"
+        return True, (doi is not None), ezid_result
+    return False, False, f"EZID not enabled for {preprint.repository}"
 
 def update_preprint_doi(preprint, request=None):
     if not preprint.preprint_doi:
         msg = f'{preprint} does not have a DOI'
         logger.info(msg)
         return True, False, msg
-    else:
-        return preprint_doi(preprint, "update", request)
+    return preprint_doi(preprint, "update", request)
 
 def mint_preprint_doi(preprint, request=None):
     if preprint.preprint_doi:
         msg = f'{preprint} already has a DOI: {preprint.preprint_doi}'
         logger.info(msg)
         return True, False, msg
-    else:
-        return preprint_doi(preprint, "mint", request)
+    return preprint_doi(preprint, "mint", request)
 
 def preprint_publication(**kwargs):
     ''' hook script for the preprint_publication event '''
     logger.debug('>>> preprint_publication called, mint an EZID DOI...')
     preprint = kwargs.get('preprint')
     request = kwargs.get('request')
-    enabled, success, msg = mint_preprint_doi(preprint, request=request)
+    _enabled, _success, _msg = mint_preprint_doi(preprint, request=request)
 
-def get_setting(name, journal):
-    return setting_handler.get_setting('plugin:ezid', name, journal).processed_value
+def get_setting(prefix, name, journal):
+    return setting_handler.get_setting(prefix, name, journal).processed_value
 
 def get_journal_metadata(article):
     download_url = None
     if article.remote_url:
         # get id from url and add prefix to prepare item id
-        itemId = 'qt'+ article.remote_url[-8:]
+        item_id = 'qt'+ article.remote_url[-8:]
         # build content download url
-        download_url = f'https://escholarship.org/content/{itemId}/{itemId}.pdf'
+        download_url = f'https://escholarship.org/content/{item_id}/{item_id}.pdf'
     return {'now': timezone.now(),
             'target_url': article.remote_url if article.remote_url else article.url,
             'article': article,
             'title': escape_str(article.title),
             'abstract': escape_str(article.abstract),
             'doi': article.get_doi(),
-            'depositor_name': setting_handler.get_setting('Identifiers', 'crossref_name', article.journal).processed_value,
-            'depositor_email': setting_handler.get_setting('Identifiers', 'crossref_email', article.journal).processed_value,
-            'registrant': setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value,
+            'depositor_name': get_setting('Identifiers', 'crossref_name', article.journal),
+            'depositor_email': get_setting('Identifiers', 'crossref_email', article.journal),
+            'registrant': get_setting('Identifiers', 'crossref_registrant', article.journal),
             'download_url': download_url,
             'license_url': get_license_url(article)}
 
 def get_journal_template(journal):
-    return 'ezid/book_chapter.xml' if get_setting('ezid_book_chapter', journal) else 'ezid/journal_content.xml'
+    is_book_chapter = get_setting('plugin:ezid', 'ezid_book_chapter', journal)
+    return 'ezid/book_chapter.xml' if is_book_chapter else 'ezid/journal_content.xml'
 
 def journal_article_doi(article, action, request):
-    if get_setting('ezid_plugin_enable', article.journal):
+    if get_setting('plugin:ezid', 'ezid_plugin_enable', article.journal): # pylint: disable=no-else-return
         if not is_valid_issn(article.journal.issn) and not is_valid_url(article.journal.issn):
             msg = f"Invalid ISSN {article.journal.issn} for {article.journal}"
-            if request: messages.error(request, msg)
+            if request:
+                messages.error(request, msg)
             return True, False, msg
 
         ezid_metadata = get_journal_metadata(article)
         if not ezid_metadata["doi"] and action != "mint":
             msg = f"{article} not assigned a DOI"
-            if request: messages.error(request, msg)
+            if request:
+                messages.error(request, msg)
             return True, False, msg
         template = get_journal_template(article.journal)
 
@@ -266,24 +275,26 @@ def journal_article_doi(article, action, request):
         else:
             method = "PUT"
 
-        username = get_setting('ezid_plugin_username', article.journal)
-        password = get_setting('ezid_plugin_password', article.journal)
-        endpoint_url = get_setting('ezid_plugin_endpoint_url', article.journal)
-        owner = setting_handler.get_setting('Identifiers', 'crossref_registrant', article.journal).processed_value
+        username = get_setting('plugin:ezid', 'ezid_plugin_username', article.journal)
+        password = get_setting('plugin:ezid', 'ezid_plugin_password', article.journal)
+        endpoint_url = get_setting('plugin:ezid', 'ezid_plugin_endpoint_url', article.journal)
+        owner = get_setting('Identifiers', 'crossref_registrant', article.journal)
 
         if not username or not password or not endpoint_url or not owner:
             msg = f"EZID not fully configured for {article.journal}"
-            if request: messages.error(request, msg)
+            if request:
+                messages.error(request, msg)
             return True, False, msg
 
         path = f'id/doi:{encode(ezid_metadata["doi"])}'
         payload = prepare_payload(ezid_metadata, template, ezid_metadata["target_url"], owner)
         ezid_result = send_request(method, path, payload, username, password, endpoint_url)
         doi = process_ezid_result(article, action, ezid_result, request)
-        return True, (doi != None), ezid_result
+        return True, (doi is not None), ezid_result
     else:
         msg = f"EZID not enabled for {article.journal}"
-        if request: messages.warning(request, msg)
+        if request:
+            messages.warning(request, msg)
         return False, False, msg
 
 def update_journal_doi(article, request=None):
@@ -294,6 +305,6 @@ def register_journal_doi(article, request=None):
 
 def assign_article_doi(**kwargs):
     article = kwargs.get('article')
-    if get_setting('ezid_plugin_enable', article.journal):
+    if get_setting('plugin:ezid', 'ezid_plugin_enable', article.journal):
         if not article.get_doi():
-            id = id_logic.generate_crossref_doi_with_pattern(article)
+            _id = id_logic.generate_crossref_doi_with_pattern(article)
