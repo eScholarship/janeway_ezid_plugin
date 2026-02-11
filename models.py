@@ -39,12 +39,18 @@ class IssueDoiRefreshHistory(models.Model):
         choices=TaskStatus.choices,
         default=TaskStatus.PENDING,
     )
-    def result_text(self):
-        if self.status != TaskStatus.PENDING or self.status != TaskStatus.IN_PROGRESS:
-            total_success = self.ArticleDoiRefreshHistory_set.filter(status=TaskStatus.SUCCESS).count()
-            total = self.ArticleDoiRefreshHistory_set.all().count()
-            return f"Successfully refreshed doi for {total_success} of {total} articles"
 
+    def is_complete(self):
+        return self.status != TaskStatus.PENDING and self.status != TaskStatus.IN_PROGRESS
+
+    def result_text(self):
+        if self.is_complete():
+            if self.articledoirefreshhistory_set:
+                total_success = self.articledoirefreshhistory_set.filter(status=TaskStatus.SUCCESS).count()
+                total = self.articledoirefreshhistory_set.all().count()
+                return f"Successfully refreshed doi for {total_success} of {total} articles"
+            else:
+                return "No article processed"
         return "Doi refresh in process"
 
     def __str__(self):
