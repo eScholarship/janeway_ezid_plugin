@@ -8,4 +8,5 @@ from plugins.ezid import views
 
 urlpatterns = [
     re_path(r'^manager/$', views.ezid_manager, name='ezid_manager'),
+    re_path(r'^issues/(?P<issue_id>\d+)/refresh/$', views.trigger_issue_refresh, name='issue_refresh'),
 ]

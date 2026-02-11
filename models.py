@@ -25,6 +25,7 @@ class TaskStatus(models.IntegerChoices):
     IN_PROGRESS = 2, "In Progress"
     SUCCESS = 3, "Success"
     FAILURE = 4, "Failure"
+    ABORTED = 5, "Aborted"
 
 class IssueDoiRefreshHistory(models.Model):
     id = models.BigAutoField(primary_key=True)
