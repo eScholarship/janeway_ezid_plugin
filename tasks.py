@@ -1,10 +1,9 @@
 from .models import IssueDoiRefreshHistory, ArticleDoiRefreshHistory, TaskStatus
 from django.utils import timezone
-import random
-#import logging 
 import time
-#logger = logging.getLogger("django_q")
 from utils.logger import get_logger
+from .logic import update_journal_doi
+
 logger = get_logger(__name__)
 
 def refresh_issue_doi(issueh_id):
@@ -17,8 +16,7 @@ def refresh_issue_doi(issueh_id):
     except Issue.DoesNotExist:
         return f"Issueh {issueh_id} not found"
 
-    # Simulate some work
-    success = random.choice([True, False])
+    success = False
     result_text = "Simulated DOI refresh result"
 
     # get the list of articles
@@ -32,16 +30,18 @@ def refresh_issue_doi(issueh_id):
         x.save()
         logger.info(f"Working on article {a}")
         # do work for each article
-        # result = update_doi()
-
+        isDone, isDoi, msg = update_journal_doi(a)
+        logger.info(f"result is isDone={isDone} and isDoi={isDoi}")
+        success = isDone and isDoi
+        x.result = msg
         x.status = TaskStatus.SUCCESS if success else TaskStatus.FAILURE
         x.date_completed = timezone.now()
         x.save()
 
-    # do everything in 
+        # if failed then break the loop
+        if not success:
+            break
 
-
-    #time.sleep(1000) # sleep for 1000 secs
 
     issueh.status = TaskStatus.SUCCESS if success else TaskStatus.FAILURE
     issueh.date_completed = timezone.now()
