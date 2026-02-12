@@ -54,3 +54,22 @@ def issue_history(request, issuehist_id):
         'ahistory': articlehist
     }
     return render(request, template, context)
+
+
+def trigger_all_refresh(request):
+    logger.info("In TRIGGER All")
+    issues = None
+    if request.journal:
+        logger.error("FOUND JOURNAL")
+        issues = Issue.objects.filter(journal=request.journal)
+    else:
+        logger.error("NO JOURNAL IN REQ")
+
+        
+    for i in issues:
+        x = IssueDoiRefreshHistory.objects.create(
+            issue=i,
+            date_refresh=timezone.now()
+        )
+        async_task(refresh_issue_doi, x.id)
+    return redirect("ezid_manager")

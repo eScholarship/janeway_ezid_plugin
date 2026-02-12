@@ -48,7 +48,7 @@ class IssueDoiRefreshHistory(models.Model):
             if self.articledoirefreshhistory_set:
                 total_success = self.articledoirefreshhistory_set.filter(status=TaskStatus.SUCCESS).count()
                 total = self.articledoirefreshhistory_set.all().count()
-                return f"Successfully refreshed doi for {total_success} of {total} articles"
+                return f"Refreshed doi for {total_success} of {total} articles"
             else:
                 return "No article processed"
         return "Doi refresh in process"
