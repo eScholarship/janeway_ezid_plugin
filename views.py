@@ -41,3 +41,16 @@ def trigger_issue_refresh(request, issue_id):
     )
     async_task(refresh_issue_doi, x.id)
     return redirect("ezid_manager")
+
+def issue_history(request, issuehist_id):
+    logger.info("In HISTORY")
+    template = 'ezid/issuehist_details.html'
+    articlehist = ArticleDoiRefreshHistory.objects.filter(issue_hist_id=issuehist_id)
+
+    logger.info("The issues are:")
+    logger.info(articlehist)
+    context = {
+        'plugin_name': PLUGIN_NAME,
+        'ahistory': articlehist
+    }
+    return render(request, template, context)

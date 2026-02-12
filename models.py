@@ -74,7 +74,7 @@ class ArticleDoiRefreshHistory(models.Model):
         choices=TaskStatus.choices,
         default=TaskStatus.PENDING,
     )
-    issue_pub = models.ForeignKey('IssueDoiRefreshHistory',
+    issue_hist = models.ForeignKey('IssueDoiRefreshHistory',
                                   blank=True,
                                   null=True,
                                   on_delete=models.CASCADE)

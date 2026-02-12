@@ -33,7 +33,6 @@
                 {% for issue in issues %}
                 <tr>
                     <td>{{ issue.id}}</td>
-		    <!-- <td><a href="{% url 'manage_issues_id' issue.id %}">Volume {{ issue.volume }} Issue {{ issue.issue }}{{ issue.issue_title }} ({{issue.date.year}})</a></td> -->
 		    <td><a href="{% url 'manage_issues_id' issue.id %}">{{issue.display_title}}</a></td>
 		    <td>{{issue.date_published}}</td>
                     {% with history=issue.issuedoirefreshhistory_set.all %}
@@ -81,8 +80,9 @@
                     <td>{{ h.date_refresh }}</td>
                     <td>{{ h.get_status_display }}</td>
 		    <td>{% if h.is_complete %} {{ h.result_text }} {% else %} In progress {% endif %}</td>
-                </tr>
-                {% endfor %}
+		     <td><a class="button" href="{% url 'issue_history' h.id %}">View Details</a></td>
+		</tr>
+		{% endfor %}
             </tbody>
         </table>
     </div>
