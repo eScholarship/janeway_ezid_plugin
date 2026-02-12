@@ -82,8 +82,8 @@ class ArticleDoiRefreshHistory(models.Model):
     def __str__(self):
         success = self.get_status_display() #"successful" if self.success else "failed"
         s = f"{self.article} doi refresh {success} on {self.date_refresh}"
-        if self.issue_pub:
-            s += f" with {self.issue_pub.issue}"
+        if self.issue_hist:
+            s += f" with {self.issue_hist.issue}"
         return s
 
     class Meta:
