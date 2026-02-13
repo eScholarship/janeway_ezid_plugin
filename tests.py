@@ -319,7 +319,7 @@ class EZIDJournalTest(TestCase):
         enabled, success, msg = logic.update_journal_doi(self.article)
 
         mock_send.assert_called_once_with(
-            "POST",
+            "PUT",
             EZID_PATH,
             payload,
             EZID_USERNAME,
@@ -388,7 +388,7 @@ class EZIDJournalTest(TestCase):
         enabled, success, msg = logic.update_journal_doi(self.article)
 
         mock_send.assert_called_once_with(
-            "POST",
+            "PUT",
             EZID_PATH,
             payload,
             EZID_USERNAME,
@@ -414,7 +414,7 @@ class EZIDJournalTest(TestCase):
         enabled, success, msg = logic.update_journal_doi(self.article)
 
         mock_send.assert_called_once_with(
-            "POST",
+            "PUT",
             EZID_PATH,
             payload,
             EZID_USERNAME,
@@ -442,7 +442,7 @@ class EZIDJournalTest(TestCase):
         enabled, success, msg = logic.update_journal_doi(self.article)
 
         mock_send.assert_called_once_with(
-            "POST",
+            "PUT",
             EZID_PATH,
             payload,
             EZID_USERNAME,
@@ -468,7 +468,7 @@ class EZIDJournalTest(TestCase):
         enabled, success, msg = logic.update_journal_doi(self.article)
 
         mock_send.assert_called_once_with(
-            "POST",
+            "PUT",
             EZID_PATH,
             payload,
             EZID_USERNAME,
@@ -493,7 +493,7 @@ class EZIDJournalTest(TestCase):
         enabled, success, msg = logic.update_journal_doi(self.article)
 
         mock_send.assert_called_once_with(
-            "POST",
+            "PUT",
             EZID_PATH,
             payload,
             EZID_USERNAME,

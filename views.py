@@ -1,14 +1,16 @@
 """
 EZID plugin views module (currently placeholder)
 """
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.utils import timezone
+from django_q.tasks import async_task
+
+from journal.models import Issue
+from utils.logger import get_logger
+
 from .models import IssueDoiRefreshHistory, ArticleDoiRefreshHistory
 from .plugin_settings import PLUGIN_NAME
-from journal.models import Issue
-from submission.models import Article
-from utils.logger import get_logger
-from django_q.tasks import async_task
 from .tasks import refresh_issue_doi
 
 logger = get_logger(__name__)
@@ -29,6 +31,7 @@ def ezid_manager(request):
     }
     return render(request, template, context)
 
+@login_required
 def trigger_issue_refresh(request, issue_id):
     x = IssueDoiRefreshHistory.objects.create(
         issue_id=issue_id,
@@ -47,7 +50,7 @@ def issue_history(request, issuehist_id):
     }
     return render(request, template, context)
 
-
+@login_required
 def trigger_all_refresh(request):
     logger.info("In TRIGGER All")
     issues = None

@@ -41,24 +41,33 @@ class IssueDoiRefreshHistory(models.Model):
     )
 
     def is_complete(self):
-        return self.status != TaskStatus.PENDING and self.status != TaskStatus.IN_PROGRESS
+        return self.status not in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
 
     def result_text(self):
         if self.is_complete():
             if self.articledoirefreshhistory_set:
-                total_success = self.articledoirefreshhistory_set.filter(status=TaskStatus.SUCCESS).count()
-                total = self.articledoirefreshhistory_set.all().count()
-                return f"Refreshed doi for {total_success} of {total} articles"
-            else:
-                return "No article processed"
+                total_success = (
+                    self.articledoirefreshhistory_set
+                    .filter(status=TaskStatus.SUCCESS)
+                    .count()
+                )
+
+                total = (
+                    self.articledoirefreshhistory_set
+                    .all()
+                    .count()
+                )
+
+                return (
+                    f"Refreshed doi for {total_success} of {total} articles"
+                )
+
+            return "No article processed"
+
         return "Doi refresh in process"
 
     def __str__(self):
-        success = self.get_status_display() # "successful" if self.success else "failed"
-        s = f"{self.issue} doi refresh {success} on {self.date_refresh}"
-        if self.issue_pub:
-            s += f" with {self.issue_pub.issue}"
-        return s
+        return self.result_text()
 
     class Meta:
         ordering = ['-date_refresh']
@@ -80,7 +89,7 @@ class ArticleDoiRefreshHistory(models.Model):
                                   on_delete=models.CASCADE)
 
     def __str__(self):
-        success = self.get_status_display() #"successful" if self.success else "failed"
+        success = self.get_status_display()
         s = f"{self.article} doi refresh {success} on {self.date_refresh}"
         if self.issue_hist:
             s += f" with {self.issue_hist.issue}"
