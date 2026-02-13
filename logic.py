@@ -100,15 +100,14 @@ class EzidHTTPErrorProcessor(urlreq.HTTPErrorProcessor):
 # But I'm concentrating on simpler refactoring for now
 def send_request(method, path, data, username, password, endpoint_url): # pylint: disable=too-many-arguments,too-many-positional-arguments
     ''' sends a request to EZID '''
+    # Sent PUT for both create and update for Journal dois
     if method == 'PUT':
         request_url = f"{endpoint_url}/{path}?update_if_exists=yes"
     else:
         request_url = f"{endpoint_url}/{path}"
 
-    #print(f"Sending request to {request_url}")
     opener = urlreq.build_opener(EzidHTTPErrorProcessor())
     ezid_handler = urlreq.HTTPBasicAuthHandler()
-    #print(f'Username {username} and {password}')
     ezid_handler.add_password("EZID", endpoint_url, username, password)
     opener.add_handler(ezid_handler)
 
@@ -119,7 +118,6 @@ def send_request(method, path, data, username, password, endpoint_url): # pylint
 
     try:
         connection = opener.open(request)
-        #print(connection.status)
         response = connection.read()
         return response.decode("UTF-8")
 
@@ -136,7 +134,6 @@ def prepare_payload(ezid_metadata, template, target_url, owner):
     metadata = _re_combine_whitespace.sub(" ", render_to_string(template, ezid_metadata)).strip()
     payload = (f"crossref: {metadata}\n_crossref: yes\n"
                f"_profile: crossref\n_target: {target_url}\n_owner: {owner}")
-    #print(payload)
     return payload
 
 def process_ezid_result(item, action, ezid_result, request):
@@ -296,7 +293,6 @@ def journal_article_doi(article, action, request):
         path = f'id/doi:{encode(ezid_metadata["doi"])}'
         payload = prepare_payload(ezid_metadata, template, ezid_metadata["target_url"], owner)
         ezid_result = send_request(method, path, payload, username, password, endpoint_url)
-        print(f"RESULT is {ezid_result}")
         doi = process_ezid_result(article, action, ezid_result, request)
         return True, (doi is not None), ezid_result
     else:

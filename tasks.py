@@ -7,17 +7,16 @@ from .logic import update_journal_doi
 logger = get_logger(__name__)
 
 def refresh_issue_doi(issueh_id):
+    """
+    Task function that Django-Q runs asynchronously to refresh dois.
+    """
     logger.info(f"Running refresh_issue_doi with issueh_id={issueh_id}")
-    """
-    Task function that Django-Q can run asynchronously.
-    """
     try:
         issueh =  IssueDoiRefreshHistory.objects.get(id=issueh_id)
     except Issue.DoesNotExist:
-        return f"Issueh {issueh_id} not found"
+        return f"Issuehistory {issueh_id} not found"
 
     success = False
-    result_text = "Simulated DOI refresh result"
 
     # get the list of articles
     for a in issueh.issue.get_sorted_articles():
@@ -38,7 +37,7 @@ def refresh_issue_doi(issueh_id):
         x.date_completed = timezone.now()
         x.save()
 
-        # if failed then break the loop
+        # if failed then stop
         if not success:
             break
 
