@@ -22,7 +22,7 @@ def ezid_manager(request):
     else:
         logger.error("NO JOURNAL IN REQ")
         issues = Issue.objects.all()
- 
+
     issueshist = IssueDoiRefreshHistory.objects.filter(issue__in=issues)
     context = {
         'plugin_name': PLUGIN_NAME,

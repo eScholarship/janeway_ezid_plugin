@@ -3,8 +3,6 @@ EZID plugin models module
 """
 
 from django.db import models
-from journal.models import Journal
-from submission.models import Article
 from repository.models import Repository
 
 class RepoEZIDSettings(models.Model):
@@ -21,6 +19,7 @@ class RepoEZIDSettings(models.Model):
 
 
 class TaskStatus(models.IntegerChoices):
+    """Task status enum for Bulk Doi updates"""
     PENDING = 1, "Pending"
     IN_PROGRESS = 2, "In Progress"
     SUCCESS = 3, "Success"
@@ -28,6 +27,7 @@ class TaskStatus(models.IntegerChoices):
     ABORTED = 5, "Aborted"
 
 class IssueDoiRefreshHistory(models.Model):
+    """Issue level history of bulk DOI update"""
     id = models.BigAutoField(primary_key=True)
     date_refresh = models.DateTimeField(auto_now_add=True)
     date_completed = models.DateTimeField(null=True)
@@ -73,6 +73,7 @@ class IssueDoiRefreshHistory(models.Model):
         ordering = ['-date_refresh']
 
 class ArticleDoiRefreshHistory(models.Model):
+    """Article level history for bulk DOI update"""
     id = models.BigAutoField(primary_key=True)
     article = models.ForeignKey('submission.Article', on_delete=models.CASCADE)
     date_refresh = models.DateTimeField(auto_now_add=True)

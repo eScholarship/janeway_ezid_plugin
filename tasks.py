@@ -1,3 +1,9 @@
+"""
+Tasks for refreshing DOIs via Django‑Q.
+
+This module defines asynchronous task functions used to update
+journal and article DOIs and record their refresh history.
+"""
 from django.utils import timezone
 from utils.logger import get_logger
 from .models import (
@@ -58,4 +64,3 @@ def refresh_issue_doi(issueh_id):
         f"Completed Running refresh_issue_doi with issue_id={issueh_id}"
     )
     return f"DOI refresh complete for Issue {issueh_id}"
-
