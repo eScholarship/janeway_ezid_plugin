@@ -71,6 +71,8 @@ class IssueDoiRefreshHistory(models.Model):
 
     class Meta:
         ordering = ['-date_refresh']
+        verbose_name = "Issue DOI Refresh History"
+        verbose_name_plural = "Issue DOI Refresh Histories"
 
 class ArticleDoiRefreshHistory(models.Model):
     """Article level history for bulk DOI update"""
@@ -98,3 +100,5 @@ class ArticleDoiRefreshHistory(models.Model):
 
     class Meta:
         ordering = ['-date_refresh']
+        verbose_name = "Article DOI Refresh History"
+        verbose_name_plural = "Article DOI Refresh Histories"
