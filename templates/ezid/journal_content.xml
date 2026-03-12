@@ -64,37 +64,41 @@
                  <abstract xmlns="http://www.ncbi.nlm.nih.gov/JATS1">
                     <p>{{ abstract|striptags|escape }}</p>
                   </abstract>
-                 {% endif %}
-                 {% if article.date_published %}
+                  {% endif %}
+                {% if article.date_published %}
                 <publication_date media_type="online">
                     <month>{{ article.date_published.month }}</month>
                     <day>{{ article.date_published.day }}</day>
                     <year>{{ article.date_published.year }}</year>
                 </publication_date>
-		{% endif %}
-		{% if license_url %}
-		<program xmlns="http://www.crossref.org/AccessIndicators.xsd">
-			<free_to_read/>
-			<license_ref>{{license_url}}</license_ref>
-		</program>
                 {% endif %}
+
+                {% if license_url %}
+                <program xmlns="http://www.crossref.org/AccessIndicators.xsd">
+                    <free_to_read/>
+                    <license_ref>{{ license_url }}</license_ref>
+                </program>
+                {% endif %}
+
                 <doi_data>
-                    {% with doi=article.get_doi %}
-                      {% if doi %}
+                    {% with doi = article.get_doi %}
+                        {% if doi %}
                         <doi>{{ doi }}</doi>
-                      {% endif %}
+                        {% endif %}
                     {% endwith %}
-		    <resource>{{ target_url }}</resource>
+
+                    <resource>{{ target_url }}</resource>
+
                     {% if download_url %}
                     <collection property="text-mining">
-                      <item>
-                        <resource mime_type="application/pdf">
-                          {{ download_url }}
-                        </resource>
-                      </item>
-	            </collection>
-                    {% endif %}  
-                </doi_data>
+                        <item>
+                            <resource mime_type="application/pdf">
+                                {{ download_url }}
+                            </resource>
+                        </item>
+                    </collection>
+                    {% endif %}
+                </doi_data>                  
             </journal_article>
         </journal>
     </body>
