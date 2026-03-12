@@ -1,7 +1,7 @@
 """
 EZID plugin views module (currently placeholder)
 """
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import user_passes_test
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django_q.tasks import async_task
@@ -13,8 +13,14 @@ from .models import IssueDoiRefreshHistory, ArticleDoiRefreshHistory
 from .plugin_settings import PLUGIN_NAME
 from .tasks import refresh_issue_doi
 
+superuser_required = user_passes_test(
+    lambda u: u.is_superuser,
+    login_url=None  # returning 403 for non-superusers
+)
+
 logger = get_logger(__name__)
 
+@superuser_required
 def ezid_manager(request):
     template = 'ezid/manager.html'
     if request.journal:
@@ -31,7 +37,7 @@ def ezid_manager(request):
     }
     return render(request, template, context)
 
-@login_required
+@superuser_required
 def trigger_issue_refresh(request, issue_id):
     x = IssueDoiRefreshHistory.objects.create(
         issue_id=issue_id,
@@ -50,7 +56,7 @@ def issue_history(request, issuehist_id):
     }
     return render(request, template, context)
 
-@login_required
+@superuser_required
 def trigger_all_refresh(request):
     logger.info("In TRIGGER All")
     issues = None
