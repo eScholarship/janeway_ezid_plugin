@@ -44,8 +44,8 @@
           {% for a in article.frozen_authors.all %}
           {% if a.is_corporate %}
             <organization>{{ a.institution }}</organization>
-          {% else %}
-          <person_name contributor_role="author" sequence="{% if a.order == 0 %}first{% else %}additional{% endif %}">
+	  {% else %}
+	  <person_name contributor_role="author" {% if forloop.first %}sequence="first"{% else %}sequence="additional"{% endif %}>
             <given_name>{{ a.given_names }}</given_name>
             <surname>{{ a.last_name }}</surname>
             {% if a.orcid %}
