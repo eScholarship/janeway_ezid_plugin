@@ -21,17 +21,7 @@ def is_refresh_okay(article):
     """
     if article.stage != "Published":
         return False, f'Skipping. Expected stage Published, actual {article.stage}'
-    # waiting for more input on date updated check
-    """
-    if article.date_published < article.date_updated:
-        return (
-            False,
-            (
-                f"Skipping. Article updated {article.date_updated} "
-                f"after publishing on {article.date_published}"
-            )
-        )
-    """
+    # TBD waiting for more input on date updated check
     return True, "Okay to proceed"
 
 def refresh_article_doi(article, issueh):
