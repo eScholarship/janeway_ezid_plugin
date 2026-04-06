@@ -51,7 +51,7 @@ jobs:
       env:
         DB: postgres
         DB_HOST: 127.0.0.1
-        DB_PORT: 3306
+        DB_PORT: 5432
         DB_PASSWORD: test_password!
         DB_VENDOR: postgres
         DB_NAME: janeway
