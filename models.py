@@ -59,12 +59,12 @@ class IssueDoiRefreshHistory(models.Model):
                 )
 
                 return (
-                    f"Refreshed doi for {total_success} of {total} articles"
+                    f"Refreshed DOI for {total_success} of {total} articles"
                 )
 
             return "No article processed"
 
-        return "Doi refresh in process"
+        return "DOI refresh in process"
 
     def __str__(self):
         return self.result_text()
@@ -93,7 +93,7 @@ class ArticleDoiRefreshHistory(models.Model):
 
     def __str__(self):
         success = self.get_status_display()
-        s = f"{self.article} doi refresh {success} on {self.date_refresh}"
+        s = f"{self.article} DOI refresh {success} on {self.date_refresh}"
         if self.issue_hist:
             s += f" with {self.issue_hist.issue}"
         return s
