@@ -12,17 +12,16 @@ jobs:
     runs-on: ubuntu-latest
     
     services:
-      mysql:
-        image: mysql:8.4
+      postgres:
+        image: postgres:15
         env:
-          MYSQL_ROOT_PASSWORD: test_password!
-          MYSQL_DATABASE: janeway
-          MYSQL_USER: mysql
-          MYSQL_PASSWORD: test_password!
+          POSTGRES_PASSWORD: test_password!
+          POSTGRES_DB: janeway
+          POSTGRES_USER: postgres
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping"
+          --health-cmd pg_isready
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -45,19 +44,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install django_q
-        pip install mysqlclient
     - name: Install xmllint
       run: sudo apt-get install -y libxml2-utils
     - name: Run Tests
       working-directory: ./src
       env:
-        DB: mysql
+        DB: postgres
         DB_HOST: 127.0.0.1
-        DB_PORT: 3306
+        DB_PORT: 5432
         DB_PASSWORD: test_password!
-        DB_VENDOR: mysql
+        DB_VENDOR: postgres
         DB_NAME: janeway
-        DB_USER: root
+        DB_USER: postgres
         JANEWAY_SETTINGS_MODULE: core.dev_settings
       run: |
         python manage.py install_janeway --use-defaults
