@@ -59,7 +59,7 @@ def issue_history(request, issuehist_id):
 @superuser_required
 def trigger_all_refresh(request):
     logger.info("In TRIGGER All")
-    issues = None
+    issues = []
     if request.journal:
         issues = Issue.objects.filter(journal=request.journal)
     else:
