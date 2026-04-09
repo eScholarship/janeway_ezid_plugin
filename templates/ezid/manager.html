@@ -1,15 +1,94 @@
 {% extends "admin/core/base.html" %}
 {% load foundation %}
 
-{% block title %}EZID DOI Manager{% endblock %}
+{% block title %}{{ plugin_name }}{% endblock %}
+
+{% block breadcrumbs %}
+    {{ block.super }}
+    <li><a href="{% url 'ezid_manager' %}">{{ plugin_name }}</a></li>
+{% endblock breadcrumbs %}
 
 {% block body %}
 <div class="box">
+	<p>Please click the appropriate Refresh DOI button (or buttons) to schedule a DOI refresh. You may leave this page and return after a few minutes to check the results, or refresh this browser page to see the updated status.</p>
+
+<a class="button" href="{% url 'all_refresh' %}">Refresh DOIs for all Issues</a>
+</div>
+<div class="box">
     <div class="title-area">
-        <h2>Management Form</h2>
+        <h2>Refresh DOI Issues</h2>
     </div>
     <div class="content">
-        {{ form|foundation }}
+        <table class="table table-bordered small" id="ezid_refreshdoi_articles">
+            <thead>
+                <tr>
+                    <th>Issue Id</th>
+                    <th>Issue Name</th>
+                    <th>Issue Published</th>
+                    <th>DOI Refresh Date</th>
+                    <th>Successful</th>
+                    <th>Result</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for issue in issues %}
+                <tr>
+                    <td>{{ issue.id}}</td>
+                    <td><a href="{% url 'manage_issues_id' issue.id %}">{{issue.display_title}}</a></td>
+                    <td>{{issue.date_published}}</td>
+                    {% with history=issue.issuedoirefreshhistory_set.all %}
+                    {% if history.count %}
+                    <td>{{ history.0.date_refresh }}</td>
+                    <td>{{history.0.get_status_display}}</td>
+                    <td>{{ history.0.result_text }}</td>
+                    <td>{% if history.0.is_complete %}<a class="button" href="{% url 'issue_refresh' issue.pk %}">Refresh DOI Issue</a>{% else %} In Progress {% endif %}</td>
+                    {% else %}
+                    <td>(no DOI refresh history)</td>
+		    <td></td>
+                    <td></td>
+                    <td><a class="button" href="{% url 'issue_refresh' issue.id %}">Refresh DOI Issue </a></td>
+                    {% endif %}
+                    {% endwith %}
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
-{% endblock body %}
+
+
+<div class="box">
+    <div class="title-area">
+        <h2>Refresh DOI Issues History</h2>
+    </div>
+    <div class="content">
+        <table class="table table-bordered small" id="ezid_refreshdoi_articles">
+            <thead>
+                <tr>
+                    <th>History Id</th>
+                    <th>Issue Id</th>
+                    <th>DOI Refresh Date</th>
+                    <th>Successful</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in issueshist %}
+                <tr>
+                    <td>{{ h.id}}</td>
+                    <td>{{ h.issue.pk}}</td>
+                    <td>{{ h.date_refresh }}</td>
+                    <td>{{ h.get_status_display }}</td>
+                    <td>{% if h.is_complete %} {{ h.result_text }} {% else %} In progress {% endif %}</td>
+                    <td><a class="button" href="{% url 'issue_history' h.id %}">View Details</a></td>
+		</tr>
+		{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+{% endblock body%}

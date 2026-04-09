@@ -1,0 +1,39 @@
+{% extends "admin/core/base.html" %}
+{% load foundation %}
+
+{% block title %}{{ plugin_name }}{% endblock %}
+
+{% block breadcrumbs %}
+    {{ block.super }}
+    <li><a href="{% url 'ezid_manager' %}">{{ plugin_name }}</a></li>
+{% endblock breadcrumbs %}
+
+{% block body %}
+<div class="box">
+    <div class="title-area">
+        <h2>Refresh DOI Article</h2>
+    </div>
+    <div class="content">
+        <table class="table table-bordered small" id="ezid_refreshdoi_articles">
+            <thead>
+                <tr>
+                    <th>Article</th>
+                    <th>DOI Refresh Date</th>
+                    <th>Status</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for h in ahistory %}
+                <tr>
+                    <td>{{ h.article.title}}</td>
+                    <td>{{ h.date_refresh }} </td>
+                    <td>{{ h.get_status_display }} </td>
+                    <td>{{ h.result }} </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock body%}

@@ -100,7 +100,11 @@ class EzidHTTPErrorProcessor(urlreq.HTTPErrorProcessor):
 # But I'm concentrating on simpler refactoring for now
 def send_request(method, path, data, username, password, endpoint_url): # pylint: disable=too-many-arguments,too-many-positional-arguments
     ''' sends a request to EZID '''
-    request_url = f"{endpoint_url}/{path}"
+    # Sent PUT for both create and update for Journal dois
+    if method == 'PUT':
+        request_url = f"{endpoint_url}/{path}?update_if_exists=yes"
+    else:
+        request_url = f"{endpoint_url}/{path}"
 
     opener = urlreq.build_opener(EzidHTTPErrorProcessor())
     ezid_handler = urlreq.HTTPBasicAuthHandler()
@@ -271,9 +275,9 @@ def journal_article_doi(article, action, request):
 
         if action == "update":
             ezid_metadata['update_id'] = ezid_metadata["doi"]
-            method = "POST"
-        else:
-            method = "PUT"
+
+        # use PUT to create and update with update_if_exisits flag
+        method = "PUT"
 
         username = get_setting('plugin:ezid', 'ezid_plugin_username', article.journal)
         password = get_setting('plugin:ezid', 'ezid_plugin_password', article.journal)
