@@ -1,6 +1,7 @@
 """
 EZID plugin tests module
 """
+# pylint: disable=line-too-long
 import re
 from datetime import datetime
 from freezegun import freeze_time
