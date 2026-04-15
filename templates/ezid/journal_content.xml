@@ -88,9 +88,7 @@
                     {% if download_url %}
                     <collection property="text-mining">
                         <item>
-                            <resource mime_type="application/pdf">
-                                {{ download_url }}
-                            </resource>
+                            <resource mime_type="application/pdf">{{ download_url }}</resource>
                         </item>
                     </collection>
                     {% endif %}
