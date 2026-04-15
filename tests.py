@@ -74,9 +74,7 @@ DOWNLOAD_XML = \
 """
 <collection property="text-mining">
     <item>
-        <resource mime_type="application/pdf">
-            https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf
-        </resource>
+        <resource mime_type="application/pdf">https://escholarship.org/content/qtqtXXXXXX/qtqtXXXXXX.pdf</resource>
     </item>
 </collection>
 """
@@ -184,9 +182,7 @@ PREPRINT_XML = """
         <resource>https://escholarship.org/</resource>
         <collection property="text-mining">
             <item>
-                <resource mime_type="application/pdf">
-                    http://localhost/testrepo{}
-                </resource>
+                <resource mime_type="application/pdf">http://localhost/testrepo{}</resource>
             </item>
         </collection>
     </doi_data>
