@@ -71,7 +71,7 @@ def refresh_issue_doi(issueh_id):
 
     num_failed = 0
 
-    success = TRUE # if no eligible article to publish
+    success = True # if no eligible article to publish
     # get the list of articles
     for article in issueh.issue.get_sorted_articles():
         success = refresh_article_doi(article, issueh)
